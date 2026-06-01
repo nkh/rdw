@@ -2,7 +2,7 @@
 
 `rdw` pipes your program's output into a browser. Any process that can write
 to a file descriptor can stream text, images, JSON, Markdown, or CSV into a
-named pane in a multi-window web layout — locally or over the network.
+named pane in a multi-window layout — locally or over the network.
 
 It is the web-native successor to [bash-rd](https://github.com/nkh/bash-rd),
 rewritten in Go as a self-contained binary with a persistent daemon,
@@ -17,12 +17,14 @@ your_script | rdw pipe --id build-log
 ## What it does
 
 - Routes `stdin` from any process to a named pane in the browser
+- Manages multiple windows within a single browser page (not browser tabs)
 - Supports multiple concurrent streams in split panes across multiple windows
 - Renders plain text, ANSI color, JSON trees, YAML trees, Markdown, CSV grids,
   and images
 - Maintains a session-scoped key-value store accessible from any stream or
   formatter
 - Exposes every CLI command identically via a REST API at `/api/v1/`
+- Multiple server instances can run simultaneously on different ports
 - Runs entirely from a single static binary — no runtime dependencies, no
   internet required at runtime
 
@@ -32,10 +34,14 @@ your_script | rdw pipe --id build-log
 
 ```
 Session
-  └── Window  (browser tab)
+  └── Window  (server-managed view, shown one at a time in the browser)
         └── Pane  (bounded view area, receives one Target ID)
               └── Target ID  (the name you give a stream)
 ```
+
+**Windows** are server-managed. The browser displays one window at a time and
+shows a persistent header bar listing all window names. Switch between windows
+using the keyboard bindings (`gt` / `gT`) or by clicking the header.
 
 A **Target ID** is a string matching `[a-zA-Z0-9_][a-zA-Z0-9_ -]*`, max 64
 characters, that maps a data stream to a pane.
@@ -51,11 +57,33 @@ prefix (`x:`) that triggers a side-effect instead of rendering as content.
 
 ---
 
+## Multiple servers
+
+Multiple rdw servers can run simultaneously on different ports. Use `--port`
+on every command to target a specific instance:
+
+```sh
+# start two servers
+rdw server start --port 7681
+rdw server start --port 7682
+
+# send data to the second server
+your_script | rdw pipe --id build-log --port 7682
+
+# list all running servers
+rdw server list
+```
+
+When `--port` is omitted, the default port (7681) is tried. If no server
+answers there, all registered instances are listed in the error message.
+
+---
+
 ## Project status
 
 Early implementation. The core pipeline, KV store, auth, config, layout
-schema, and CLI scaffold are complete and tested. The HTTP/WebSocket server,
-browser UI, and REST API are the next layer.
+schema, discovery, bindings, and CLI scaffold are complete and tested. The
+HTTP/WebSocket server, browser UI, and REST API are the next layer.
 
 | Package | Description | Coverage |
 | --- | --- | --- |
@@ -65,10 +93,12 @@ browser UI, and REST API are the next layer.
 | `internal/pipeline` | Line relay, filter chain, KV dispatch | 93% |
 | `internal/auth` | SHA-256 hashed token access control | 91% |
 | `internal/config` | YAML config loader with validation | 76% |
-| `internal/layout` | Window/pane schema, resize arg parser | 100% |
+| `internal/layout` | Window/pane schema, YAML parser, resize | 100% |
+| `internal/bindings` | Keyboard binding model, vim defaults | 100% |
+| `internal/discovery` | Multi-server registry and auto-detect | 58% |
 | `internal/selftest` | In-process smoke test suite | 80% |
 
-96 tests, 83.2% overall statement coverage.
+134 tests, 76.1% overall statement coverage.
 
 ---
 
@@ -103,6 +133,11 @@ rdw server start --open-browser
 ```
 
 The server listens on port `7681` by default. The browser opens automatically.
+To run a second server:
+
+```sh
+rdw server start --port 7682 --open-browser
+```
 
 Send data to a pane:
 
@@ -110,59 +145,223 @@ Send data to a pane:
 # plain text
 your_script | rdw pipe --id my-pane
 
+# with a layout — create layout on first use, reuse on subsequent calls
+your_script | rdw pipe --id build-log --layout layouts/debug.yaml
+
+# route into a specific window by name
+your_script | rdw pipe --id build-log --window build
+
 # formatted JSON
 curl -s api.example.com/status | rdw json --id api-status
 
 # image from a file
 rdw image --id chart --path ./output.png
-
-# Markdown document
-cat NOTES.md | rdw markdown --id notes
 ```
 
 Stop the server:
 
 ```sh
 rdw server stop
+rdw server stop --port 7682
 ```
 
 ---
 
-## Pane layout
+## Layout description language
 
-Create and split panes from the CLI or by dragging in the browser.
+Layouts are YAML files. The server uses them to construct the pane arrangement
+in the browser when a layout is applied or first referenced.
+
+```yaml
+schema_version: 1        # required; must be 1
+name: debug              # optional preset name
+
+windows:
+  - name: build          # display name shown in the window header bar
+    panes:
+      - target_id: stdout          # stream name routed to this pane
+      - target_id: stderr
+        split: h                   # h = new pane below; v = new pane to the right
+        size: 30%                  # N (columns), Npx, N%
+        group: ci                  # optional pane group
+        private: false             # hide from non-owner tokens
+        scrollback_cap: 5000       # per-pane cap (default: 10 000, max: 100 000)
+
+  - name: metrics
+    panes:
+      - target_id: cpu
+      - target_id: mem
+        split: v
+        size: 50%
+      - target_id: disk
+        split: h
+        size: 25%
+```
+
+The first pane in each window needs no `split` field; it occupies the whole
+window until subsequent panes subdivide it.
+
+Apply a layout from the CLI:
 
 ```sh
-# create a window from a layout config file
-rdw window create --config layouts/debug.yaml
+# from a file
+rdw layout apply ./layouts/debug.yaml
 
-# split an existing pane vertically and assign a new target
+# from a saved preset
+rdw layout apply debug
+
+# create the layout interactively and save it
+rdw layout save --name debug
+```
+
+Pass a layout directly to `pipe` — if it is not already active it is created:
+
+```sh
+your_script | rdw pipe --id build-log --layout debug
+```
+
+---
+
+## Window management
+
+Windows are server-managed views within the browser page. The browser shows
+one window at a time and a header bar lists all windows.
+
+```sh
+rdw window create build
+rdw window create metrics
+rdw window list
+rdw window focus metrics
+rdw window rename build build-v2
+rdw window close build-v2
+```
+
+Switch windows in the browser using the keyboard bindings or by clicking
+the header bar.
+
+---
+
+## Pane management
+
+```sh
+# split vertically and assign a new target
 rdw pane split build-log v error-log
-
-# zoom a pane to full window
-rdw pane zoom error-log
 
 # resize — columns (default), pixels, or percentage
 rdw pane resize build-log right 40%
 rdw pane resize build-log right 200px
 rdw pane resize build-log right 40
 
+# zoom a pane to full window (toggle)
+rdw pane zoom error-log
+
 # swap two panes
 rdw pane swap build-log error-log
 
-# detach a pane into another window
-rdw pane detach build-log --to-window debug
+# close a pane
+rdw pane close error-log
 ```
 
-Layouts can be saved and restored:
+---
 
-```sh
-rdw layout save --name debug-session
-rdw server start --restore
+## Keyboard bindings
+
+The browser UI is fully keyboard-driven with vim-like defaults. All bindings
+can be overridden in the configuration file under the `bindings:` section.
+
+### Window navigation
+
+| Key | Action |
+| --- | --- |
+| `gt` | next window |
+| `gT` | previous window |
+| `g0` | first window |
+| `g$` | last window |
+| `gn` | create new window |
+| `gx` | close active window |
+| `gr` | rename active window (opens prompt) |
+
+### Pane navigation
+
+| Key | Action |
+| --- | --- |
+| `h` | focus pane left |
+| `j` | focus pane below |
+| `k` | focus pane above |
+| `l` | focus pane right |
+
+### Pane editing
+
+| Key | Action |
+| --- | --- |
+| `s` | split horizontally (new pane below) |
+| `v` | split vertically (new pane right) |
+| `H` | resize pane left |
+| `J` | resize pane down |
+| `K` | resize pane up |
+| `L` | resize pane right |
+| `q` | close focused pane |
+| `z` | toggle zoom (full window) |
+| `R` | rename pane target ID (opens prompt) |
+| `x` | enter swap mode: next `hjkl` picks the target to swap with |
+
+### Scrollback
+
+| Key | Action |
+| --- | --- |
+| `Ctrl+u` | scroll up |
+| `Ctrl+d` | scroll down |
+| `gg` | scroll to top |
+| `G` | scroll to bottom |
+| `Ctrl+l` | clear scrollback |
+
+### Search
+
+| Key | Action |
+| --- | --- |
+| `/` | open search |
+| `n` | next match |
+| `N` | previous match |
+
+### Layout
+
+| Key | Action |
+| --- | --- |
+| `Ctrl+w s` | save current layout |
+| `Ctrl+w l` | reload layout from disk |
+| `Escape` / `Ctrl+c` | return to normal mode |
+
+### Mouse support
+
+All pane operations are also available with the mouse:
+
+- **Drag** the gutter between panes to resize
+- **Click** a window name in the header to switch windows
+- **Double-click** a pane border to zoom
+- **Drag** a pane title bar to detach and re-attach it to another window
+- **Right-click** a pane for the context menu (clear, close, rename, etc.)
+
+### Customising bindings
+
+Override individual bindings in `~/.config/rdw/config.yaml`:
+
+```yaml
+bindings:
+  pane.focus.left:  [Left]
+  pane.focus.right: [Right]
+  pane.focus.up:    [Up]
+  pane.focus.down:  [Down]
+  window.next:      [Tab]
+  window.prev:      [Shift+Tab]
 ```
 
-Layout files carry a `schema_version` field. The server rejects files with an
-unrecognised version.
+Any action not listed in the overrides keeps its default binding. Set an
+action to an empty list to remove its binding entirely:
+
+```yaml
+bindings:
+  pane.swap: []   # disable swap mode
+```
 
 ---
 
@@ -172,24 +371,19 @@ The server maintains a session-scoped KV store. Any stream or formatter can
 read and write it.
 
 ```sh
-# write from the CLI
 rdw kv set build.status passing
+rdw kv get build.status
+rdw kv delete build.status
 
 # write inline from a stream using a control sequence
 echo "=:build.status=passing;build.duration=42s" | rdw pipe --id build-log
-
-# read from the CLI
-rdw kv get build.status
-
-# delete a key
-rdw kv delete build.status
 
 # optional SQLite persistence across server restarts
 rdw server start --kv-persist ~/.rdw/kv.db
 ```
 
-Keys match the pattern `[a-zA-Z0-9_][a-zA-Z0-9_ :-]*`, max 64 characters.
-Values are capped at 64 KB each; the total store is capped at 64 MB.
+Keys match `[a-zA-Z0-9_][a-zA-Z0-9_ :-]*`, max 64 characters. Values are
+capped at 64 KB each; the total store is capped at 64 MB.
 
 Window- and pane-scoped keys use a prefix convention:
 
@@ -202,8 +396,8 @@ pane:<target_id>:<key>
 
 ## Control sequences
 
-A line whose first two bytes are a recognised letter and a colon is treated as
-a control sequence and is not forwarded to the renderer.
+A line whose first two bytes are a recognised letter and a colon is a control
+sequence and is not forwarded to the renderer.
 
 | Prefix | Effect |
 | --- | --- |
@@ -216,16 +410,6 @@ a control sequence and is not forwarded to the renderer.
 | `r:` | relay output to a location |
 | `=:` | write KV pairs; multiple pairs separated by `;` |
 
-Example — clear a pane and set a KV value from within a script:
-
-```sh
-echo "c:" | rdw pipe --id build-log
-echo "=:stage=linking;status=running" | rdw pipe --id build-log
-
-# send a line that looks like a control sequence without it being interpreted
-echo "v:=:this is literal content" | rdw pipe --id build-log
-```
-
 ---
 
 ## Binary data
@@ -233,75 +417,38 @@ echo "v:=:this is literal content" | rdw pipe --id build-log
 Binary payloads must be base64-encoded with a `b64:` prefix:
 
 ```sh
-base64_data=$(base64 < image.png)
-echo "b64:${base64_data}" | rdw pipe --id chart
-```
-
-The server decodes transparently before passing the data to formatters or the
-scrollback buffer. This convention matches bash-rd.
-
----
-
-## Filters and formatters
-
-A **filter** is any external executable that reads stdin and writes stdout.
-Filters are chained before rendering (maximum 8 stages per pane).
-
-```sh
-# configured in the layout file or via the REST API
-# filter chain: strip ANSI codes | grep for ERRORs | colorize
-```
-
-A **formatter** renders a pane as HTML from the stream and the KV store.
-Formatters are set per pane via the `f:` control sequence or the layout file:
-
-```sh
-echo "f:my_formatter" | rdw pipe --id build-log
+echo "b64:$(base64 < image.png)" | rdw pipe --id chart
 ```
 
 ---
 
 ## Sharing and access control
 
-Tokens scope access to specific panes or windows. The plain-text token is shown
-once at creation time; the server stores only the SHA-256 hash.
-
 ```sh
 # create a token scoped to one pane, expiring in 8 hours
 rdw token create --panes build-log --expiry 8h
 
-# revoke immediately (terminates all active WebSocket connections for that token)
+# revoke immediately
 rdw token revoke <token-id>
 ```
 
-CLI commands from the same Unix user that started the server are authenticated
-via a Unix domain socket at `$XDG_RUNTIME_DIR/rdw/<session_id>.sock`. Remote
-CLI use (via REST) requires a token.
-
-The admin console and server are loopback-only by default. `--network-expose`
-at startup extends access to the configured network interface.
+The server is loopback-only by default. `--network-expose` at startup extends
+access to the configured network interface. Tokens are stored as SHA-256 hashes.
 
 ---
 
 ## Exporting
-
-Download a pane, window, or full session as a Markdown bundle:
 
 ```sh
 rdw save pane --target-id build-log --out-dir ./export
 rdw save all --out-dir ./export
 ```
 
-The output directory contains a Markdown file structured as one top-level
-heading per window, one second-level heading per pane, scrollback content as
-body text, and an `assets/` subfolder holding all streamed binary images.
+Output is a Markdown file per window with an `assets/` subfolder for images.
 
 ---
 
 ## bash-rd compatibility
-
-`rdw` is the successor to [bash-rd](https://github.com/nkh/bash-rd). Opt-in
-forwarding to a running `rd` instance is available:
 
 ```sh
 rdw pipe --id my-pane --forward rd      # send to rd only
@@ -315,22 +462,15 @@ binary encoding convention are identical to bash-rd.
 
 ## Headless and CI use
 
-The server runs without a browser attached. Use `rdw selftest` as a smoke test
-in CI:
-
 ```sh
-rdw selftest   # exits 0 on success, non-zero on failure
+rdw selftest   # exits 0 on success
 ```
-
-The server can be started, fed data, and queried entirely via the REST API at
-`http://localhost:7681/api/v1/`.
 
 ---
 
 ## Configuration
 
-The server reads `~/.config/rdw/config.yaml` by default. Pass `--config` to
-override.
+`~/.config/rdw/config.yaml` (pass `--config` to override):
 
 ```yaml
 server:
@@ -346,29 +486,16 @@ auth:
   admin_local_only: true
 
 kv:
-  persist_path: ""   # set to a file path to enable SQLite persistence
+  persist_path: ""
 
 log:
-  level: info        # debug | info | warn | error
-  format: console    # console | json
+  level: info       # debug | info | warn | error
+  format: console   # console | json
+
+bindings:
+  # override individual keys; omitted actions keep their defaults
+  # pane.focus.left: [Left]
 ```
-
----
-
-## Security
-
-- The admin console and server are loopback-only unless `--network-expose` is
-  passed explicitly.
-- Right-click menu execution of shell commands is disabled by default and
-  requires a startup flag to enable.
-- Terminal-sharing panes (via gotty) require a dedicated restricted Unix user
-  account; the server refuses to start a terminal pane without one configured.
-- All stream content is HTML-sanitised before rendering. Raw script execution
-  in panes requires an explicit opt-in flag.
-- Tokens are stored as SHA-256 hashes only. The plain-text token is shown once
-  on creation and never stored.
-- Unauthenticated REST endpoints are rate-limited to 10 requests per minute per
-  source IP.
 
 ---
 
