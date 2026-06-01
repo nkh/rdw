@@ -1,5 +1,5 @@
 # Build outputs
-rdw
+/rdw
 /dist/
 
 # Go toolchain
