@@ -1,8 +1,17 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net"
+	"os"
+	"text/tabwriter"
+	"time"
 
+	"github.com/nkh/rdw/internal/config"
+	"github.com/nkh/rdw/internal/discovery"
+	"github.com/nkh/rdw/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -53,8 +62,6 @@ func init() {
 	serverCmd.AddCommand(serverStopCmd)
 	serverCmd.AddCommand(serverListCmd)
 
-	// --port on start overrides the persistent --port; use a local flag so the
-	// help text reads naturally ("start on port X").
 	serverStartCmd.Flags().Int("port", 0,
 		"port to listen on (default: 7681)")
 	serverStartCmd.Flags().Bool("network-expose", false,
@@ -71,26 +78,108 @@ func init() {
 
 func runServerStart(cmd *cobra.Command, _ []string) error {
 	cfgPath, _ := cmd.Root().PersistentFlags().GetString("config")
-	port, _ := cmd.Flags().GetInt("port")
-	_ = cfgPath
-	_ = port
 
-	fmt.Println("server start: not yet implemented")
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
 
-	return nil
+	// Local --port overrides config; persistent --port is for client use.
+	if port, _ := cmd.Flags().GetInt("port"); port != 0 {
+		cfg.Server.Port = port
+	}
+
+	if v, _ := cmd.Flags().GetBool("network-expose"); v {
+		cfg.Server.NetworkExpose = v
+	}
+
+	if v, _ := cmd.Flags().GetBool("no-auth"); v {
+		cfg.Auth.NoAuth = v
+	}
+
+	if v, _ := cmd.Flags().GetString("kv-persist"); v != "" {
+		cfg.KV.PersistPath = v
+	}
+
+	sessionID := fmt.Sprintf("%d", cfg.Server.Port)
+	s := server.New(cfg, server.Options{SessionID: sessionID})
+
+	return s.Run(context.Background())
 }
 
 func runServerStop(cmd *cobra.Command, _ []string) error {
 	port, _ := cmd.Root().PersistentFlags().GetInt("port")
-	_ = port
 
-	fmt.Println("server stop: not yet implemented")
+	resolvedPort, err := discovery.Resolve(port)
+	if err != nil {
+		return err
+	}
+
+	sockPath, err := unixSocketPath(fmt.Sprintf("%d", resolvedPort))
+	if err != nil {
+		return fmt.Errorf("resolving socket path: %w", err)
+	}
+
+	resp, err := sendUnixCommand(sockPath, server.UnixCommand{Action: "stop"})
+	if err != nil {
+		return fmt.Errorf("sending stop command: %w", err)
+	}
+
+	if !resp.OK {
+		return fmt.Errorf("server error: %s", resp.Error)
+	}
+
+	fmt.Fprintf(os.Stdout, "rdw server on port %d stopping\n", resolvedPort)
 
 	return nil
 }
 
 func runServerList(_ *cobra.Command, _ []string) error {
-	fmt.Println("server list: not yet implemented")
+	// Prune stale entries first.
+	_ = discovery.PruneStale()
 
-	return nil
+	servers, err := discovery.ReadRegistry()
+	if err != nil || len(servers) == 0 {
+		fmt.Println("no rdw servers registered")
+		return nil
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "PORT\tPID\tSTARTED\tSOCKET")
+
+	for _, s := range servers {
+		fmt.Fprintf(w, "%d\t%d\t%s\t%s\n",
+			s.Port, s.PID, s.StartedAt, s.SocketPath)
+	}
+
+	return w.Flush()
+}
+
+// sendUnixCommand connects to the server's Unix socket and sends a command.
+func sendUnixCommand(socketPath string, cmd server.UnixCommand) (server.UnixResponse, error) {
+	conn, err := net.DialTimeout("unix", socketPath, 3*time.Second)
+	if err != nil {
+		return server.UnixResponse{}, fmt.Errorf("connecting to %q: %w", socketPath, err)
+	}
+	defer conn.Close()
+
+	if err = json.NewEncoder(conn).Encode(cmd); err != nil {
+		return server.UnixResponse{}, fmt.Errorf("sending command: %w", err)
+	}
+
+	var resp server.UnixResponse
+	if err = json.NewDecoder(conn).Decode(&resp); err != nil {
+		return server.UnixResponse{}, fmt.Errorf("reading response: %w", err)
+	}
+
+	return resp, nil
+}
+
+// unixSocketPath returns the Unix socket path for the given session ID.
+func unixSocketPath(sessionID string) (string, error) {
+	base := os.Getenv("XDG_RUNTIME_DIR")
+	if base == "" {
+		base = os.TempDir()
+	}
+	return base + "/rdw/" + sessionID + ".sock", nil
 }
