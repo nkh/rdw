@@ -1,0 +1,627 @@
+package server_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/nkh/rdw/internal/auth"
+	"github.com/nkh/rdw/internal/config"
+	"github.com/nkh/rdw/internal/server"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+type apiClient struct {
+	base  string
+	token string
+	t     *testing.T
+}
+
+func newAPIClient(t *testing.T, ts *httptest.Server, token string) *apiClient {
+	t.Helper()
+	return &apiClient{base: ts.URL, token: token, t: t}
+}
+
+func (c *apiClient) do(method, path string, body interface{}) *http.Response {
+	c.t.Helper()
+	var r io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		r = bytes.NewReader(b)
+	}
+	req, err := http.NewRequest(method, c.base+path, r)
+	require.NoError(c.t, err)
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(c.t, err)
+	return resp
+}
+
+func (c *apiClient) get(path string) *http.Response    { return c.do("GET", path, nil) }
+func (c *apiClient) post(path string, b interface{}) *http.Response { return c.do("POST", path, b) }
+func (c *apiClient) put(path string, b interface{}) *http.Response  { return c.do("PUT", path, b) }
+func (c *apiClient) del(path string) *http.Response   { return c.do("DELETE", path, nil) }
+func (c *apiClient) patch(path string, b interface{}) *http.Response { return c.do("PATCH", path, b) }
+
+func decodeJSON(t *testing.T, resp *http.Response, v interface{}) {
+	t.Helper()
+	defer resp.Body.Close()
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(v))
+}
+
+func newNoAuthServer(t *testing.T) (*httptest.Server, *server.Server) {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Auth.NoAuth = true
+	s := server.New(cfg, server.Options{
+		SessionID: fmt.Sprintf("api-test-%d", time.Now().UnixNano()),
+	})
+	ts := httptest.NewServer(s.HTTPHandler())
+	t.Cleanup(ts.Close)
+	return ts, s
+}
+
+func newAuthServer(t *testing.T) (*httptest.Server, *server.Server, string) {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Auth.NoAuth = false
+	s := server.New(cfg, server.Options{
+		SessionID: fmt.Sprintf("api-auth-%d", time.Now().UnixNano()),
+	})
+	plain, _, err := s.TokenStore().Create(auth.CreateOptions{Expiry: time.Hour})
+	require.NoError(t, err)
+	ts := httptest.NewServer(s.HTTPHandler())
+	t.Cleanup(ts.Close)
+	return ts, s, plain
+}
+
+// ---------------------------------------------------------------------------
+// Ping
+// ---------------------------------------------------------------------------
+
+func TestAPI_Ping(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/ping")
+	assert.Equal(t, 200, resp.StatusCode)
+
+	var body map[string]string
+	decodeJSON(t, resp, &body)
+	assert.Equal(t, "ok", body["status"])
+	assert.NotEmpty(t, body["time"])
+}
+
+func TestAPI_Ping_Unauthenticated(t *testing.T) {
+	ts, _, _ := newAuthServer(t)
+	c := newAPIClient(t, ts, "") // no token
+	resp := c.get("/api/v1/ping")
+	assert.Equal(t, 200, resp.StatusCode) // ping never requires auth
+	resp.Body.Close()
+}
+
+// ---------------------------------------------------------------------------
+// Session
+// ---------------------------------------------------------------------------
+
+func TestAPI_Session_RequiresAuth(t *testing.T) {
+	ts, _, _ := newAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.get("/api/v1/session")
+	resp.Body.Close()
+	assert.Equal(t, 401, resp.StatusCode)
+}
+
+func TestAPI_Session_WithToken(t *testing.T) {
+	ts, _, token := newAuthServer(t)
+	c := newAPIClient(t, ts, token)
+	resp := c.get("/api/v1/session")
+	assert.Equal(t, 200, resp.StatusCode)
+	var body map[string]interface{}
+	decodeJSON(t, resp, &body)
+	assert.NotNil(t, body["windows"])
+}
+
+func TestAPI_Session_NoAuth(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.get("/api/v1/session")
+	assert.Equal(t, 200, resp.StatusCode)
+	resp.Body.Close()
+}
+
+// ---------------------------------------------------------------------------
+// Windows
+// ---------------------------------------------------------------------------
+
+func TestAPI_Windows_List_EmptyInitially(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/windows")
+	assert.Equal(t, 200, resp.StatusCode)
+
+	var body map[string]interface{}
+	decodeJSON(t, resp, &body)
+	wins := body["windows"]
+	assert.NotNil(t, wins)
+}
+
+func TestAPI_Windows_Create(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/windows", map[string]string{"name": "build"})
+	resp.Body.Close()
+	assert.Equal(t, 201, resp.StatusCode)
+
+	// Verify it appears in list.
+	resp2 := c.get("/api/v1/windows")
+	var body map[string]interface{}
+	decodeJSON(t, resp2, &body)
+	wins := body["windows"].([]interface{})
+	require.Len(t, wins, 1)
+	w := wins[0].(map[string]interface{})
+	assert.Equal(t, "build", w["name"])
+}
+
+func TestAPI_Windows_Create_EmptyName(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/windows", map[string]string{"name": ""})
+	resp.Body.Close()
+	assert.Equal(t, 409, resp.StatusCode)
+}
+
+func TestAPI_Windows_Create_Duplicate(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp1 := c.post("/api/v1/windows", map[string]string{"name": "dup"})
+	resp1.Body.Close()
+	require.Equal(t, 201, resp1.StatusCode)
+
+	resp2 := c.post("/api/v1/windows", map[string]string{"name": "dup"})
+	resp2.Body.Close()
+	assert.Equal(t, 409, resp2.StatusCode)
+}
+
+func TestAPI_Windows_Rename(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/windows", map[string]string{"name": "old"})
+	resp.Body.Close()
+	require.Equal(t, 201, resp.StatusCode)
+
+	resp2 := c.patch("/api/v1/windows/old", map[string]string{"name": "new"})
+	resp2.Body.Close()
+	assert.Equal(t, 204, resp2.StatusCode)
+
+	resp3 := c.get("/api/v1/windows")
+	var body map[string]interface{}
+	decodeJSON(t, resp3, &body)
+	wins := body["windows"].([]interface{})
+	w := wins[0].(map[string]interface{})
+	assert.Equal(t, "new", w["name"])
+}
+
+func TestAPI_Windows_Close(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	// Need two windows to close one.
+	c.post("/api/v1/windows", map[string]string{"name": "a"}).Body.Close()
+	c.post("/api/v1/windows", map[string]string{"name": "b"}).Body.Close()
+
+	resp := c.del("/api/v1/windows/a")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	resp2 := c.get("/api/v1/windows")
+	var body map[string]interface{}
+	decodeJSON(t, resp2, &body)
+	assert.Len(t, body["windows"].([]interface{}), 1)
+}
+
+func TestAPI_Windows_Close_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.del("/api/v1/windows/ghost")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Windows_Focus(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.post("/api/v1/windows", map[string]string{"name": "w1"}).Body.Close()
+	c.post("/api/v1/windows", map[string]string{"name": "w2"}).Body.Close()
+
+	resp := c.post("/api/v1/windows/w2/focus", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// Session should reflect the new active window.
+	resp2 := c.get("/api/v1/session")
+	var body map[string]interface{}
+	decodeJSON(t, resp2, &body)
+	assert.Equal(t, float64(1), body["active_window"])
+}
+
+func TestAPI_Windows_Focus_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/windows/nope/focus", nil)
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Stream ingest
+// ---------------------------------------------------------------------------
+
+func TestAPI_Stream_Post(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	// Register a pane in the router first.
+	id, _ := server.ParseTargetID("log")
+	_, err := s.Router().Register(id, 0)
+	require.NoError(t, err)
+
+	resp := c.post("/api/v1/stream/log", map[string]string{"line": "hello"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Stream_Post_UnknownTarget(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/stream/unknown-pane", map[string]string{"line": "data"})
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Stream_Post_InvalidID(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/stream/-bad-id", map[string]string{"line": "x"})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+func TestAPI_Stream_Post_InvalidJSON(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/stream/log", bytes.NewBufferString("{bad"))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := http.DefaultClient.Do(req)
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Panes
+// ---------------------------------------------------------------------------
+
+func setupWindowWithPane(t *testing.T, s *server.Server, winName, paneID string) {
+	t.Helper()
+	_ = s.Manager().CreateWindow(winName)
+	id, _ := server.ParseTargetID(paneID)
+	_, _ = s.Router().Register(id, 0)
+	_ = s.Manager().AddPane(winName, &server.PaneStateExport{
+		TargetID: id,
+	})
+}
+
+func TestAPI_Pane_Split(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("w")
+	parentID, _ := server.ParseTargetID("parent")
+	_, _ = s.Router().Register(parentID, 0)
+	_ = s.Manager().AddPane("w", &server.PaneStateExport{TargetID: parentID})
+
+	resp := c.post("/api/v1/panes/parent/split", map[string]interface{}{
+		"direction": "v",
+		"new_id":    "child",
+	})
+	resp.Body.Close()
+	assert.Equal(t, 201, resp.StatusCode)
+
+	// child pipeline should now be registered.
+	childID, _ := server.ParseTargetID("child")
+	_, ok := s.Router().Get(childID)
+	assert.True(t, ok)
+}
+
+func TestAPI_Pane_Split_InvalidDirection(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/panes/parent/split", map[string]interface{}{
+		"direction": "x", "new_id": "child",
+	})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+func TestAPI_Pane_Close(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.post("/api/v1/windows", map[string]string{"name": "w"}).Body.Close()
+	id, _ := server.ParseTargetID("mypane")
+	_, _ = s.Router().Register(id, 0)
+	_ = s.Manager().AddPane("w", &server.PaneStateExport{TargetID: id})
+
+	resp := c.del("/api/v1/panes/mypane")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, ok := s.Router().Get(id)
+	assert.False(t, ok, "pipeline should be deregistered after pane close")
+}
+
+func TestAPI_Pane_Close_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.del("/api/v1/panes/nope")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Pane_Resize(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/panes/mypane/resize", map[string]string{
+		"direction": "right", "size": "40%",
+	})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Pane_Resize_InvalidSize(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/panes/mypane/resize", map[string]string{
+		"direction": "right", "size": "not-a-size",
+	})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// KV store
+// ---------------------------------------------------------------------------
+
+func TestAPI_KV_SetGet(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.put("/api/v1/kv/mykey", map[string]string{"value": "myvalue"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	resp2 := c.get("/api/v1/kv/mykey")
+	var body map[string]string
+	decodeJSON(t, resp2, &body)
+	assert.Equal(t, "myvalue", body["value"])
+}
+
+func TestAPI_KV_Get_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.get("/api/v1/kv/missing")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_KV_Delete(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.put("/api/v1/kv/todelete", map[string]string{"value": "v"}).Body.Close()
+	resp := c.del("/api/v1/kv/todelete")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	resp2 := c.get("/api/v1/kv/todelete")
+	resp2.Body.Close()
+	assert.Equal(t, 404, resp2.StatusCode)
+}
+
+func TestAPI_KV_List(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.put("/api/v1/kv/a", map[string]string{"value": "1"}).Body.Close()
+	c.put("/api/v1/kv/b", map[string]string{"value": "2"}).Body.Close()
+
+	resp := c.get("/api/v1/kv")
+	var body map[string]interface{}
+	decodeJSON(t, resp, &body)
+	keys := body["keys"].([]interface{})
+	assert.Len(t, keys, 2)
+}
+
+func TestAPI_KV_List_WithPrefix(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.put("/api/v1/kv/build-status", map[string]string{"value": "ok"}).Body.Close()
+	c.put("/api/v1/kv/deploy-status", map[string]string{"value": "ok"}).Body.Close()
+
+	resp := c.get("/api/v1/kv?prefix=build")
+	var body map[string]interface{}
+	decodeJSON(t, resp, &body)
+	keys := body["keys"].([]interface{})
+	assert.Len(t, keys, 1)
+	assert.Equal(t, "build-status", keys[0].(string))
+}
+
+func TestAPI_KV_InvalidKey(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.put("/api/v1/kv/-invalid", map[string]string{"value": "x"})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Layouts
+// ---------------------------------------------------------------------------
+
+func TestAPI_Layout_SaveAndList(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/layouts", map[string]string{"name": "debug"})
+	resp.Body.Close()
+	assert.Equal(t, 201, resp.StatusCode)
+
+	resp2 := c.get("/api/v1/layouts")
+	var body map[string]interface{}
+	decodeJSON(t, resp2, &body)
+	layouts := body["layouts"].([]interface{})
+	assert.Contains(t, layouts, "debug")
+}
+
+func TestAPI_Layout_Save_NoName(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/layouts", map[string]string{})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+func TestAPI_Layout_Apply_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/layouts/nonexistent/apply", nil)
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Layout_Apply_Existing(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.post("/api/v1/layouts", map[string]string{"name": "mylay"}).Body.Close()
+	resp := c.post("/api/v1/layouts/mylay/apply", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Tokens
+// ---------------------------------------------------------------------------
+
+func TestAPI_Tokens_CreateAndList(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/tokens", map[string]interface{}{
+		"expiry_seconds": 3600,
+		"panes":          []string{"build-log"},
+	})
+	var created map[string]interface{}
+	decodeJSON(t, resp, &created)
+	assert.Equal(t, 201, resp.StatusCode)
+	assert.NotEmpty(t, created["token"])
+	assert.NotEmpty(t, created["id"])
+
+	resp2 := c.get("/api/v1/tokens")
+	var body map[string]interface{}
+	decodeJSON(t, resp2, &body)
+	tokens := body["tokens"].([]interface{})
+	assert.Len(t, tokens, 1)
+}
+
+func TestAPI_Tokens_Revoke(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/tokens", map[string]interface{}{"expiry_seconds": 3600})
+	var created map[string]interface{}
+	decodeJSON(t, resp, &created)
+
+	id := created["id"].(string)
+	resp2 := c.del("/api/v1/tokens/" + id)
+	resp2.Body.Close()
+	assert.Equal(t, 204, resp2.StatusCode)
+
+	resp3 := c.get("/api/v1/tokens")
+	var body map[string]interface{}
+	decodeJSON(t, resp3, &body)
+	tokens := body["tokens"].([]interface{})
+	assert.Len(t, tokens, 0)
+}
+
+func TestAPI_Tokens_Revoke_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.del("/api/v1/tokens/nope")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+
+func TestAPI_RateLimit_UnauthEndpoint(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	// The rate limiter is per-IP; in tests all requests come from 127.0.0.1.
+	// Send 11 unauthenticated requests to ping to trigger the limit.
+	// Note: the rate limiter only applies to unauthenticated requests.
+	var lastStatus int
+	for i := range 12 {
+		resp := c.get("/api/v1/ping")
+		lastStatus = resp.StatusCode
+		resp.Body.Close()
+		_ = i
+	}
+	// After 10 requests, remaining ones should be rate-limited.
+	assert.Equal(t, 429, lastStatus)
+}
+
+// ---------------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------------
+
+func TestAPI_Admin_Connections(t *testing.T) {
+	cfg := config.Default()
+	cfg.Auth.NoAuth = true
+	cfg.Auth.AdminLocalOnly = false // disable loopback guard for test
+	s := server.New(cfg, server.Options{
+		SessionID: fmt.Sprintf("admin-%d", time.Now().UnixNano()),
+	})
+	ts := httptest.NewServer(s.HTTPHandler())
+	t.Cleanup(ts.Close)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/admin/connections")
+	var body map[string]int
+	decodeJSON(t, resp, &body)
+	assert.Equal(t, 0, body["connections"])
+}
