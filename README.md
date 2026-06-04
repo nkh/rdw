@@ -19,14 +19,11 @@ your_script | rdw pipe --id build-log
 - Routes `stdin` from any process to a named pane in the browser
 - Manages multiple windows within a single browser page (not browser tabs)
 - Supports multiple concurrent streams in split panes across multiple windows
-- Renders plain text, ANSI color, JSON trees, YAML trees, Markdown, CSV grids,
-  and images
-- Maintains a session-scoped key-value store accessible from any stream or
-  formatter
+- Renders plain text with ANSI 24-bit color passthrough
+- Maintains a session-scoped key-value store accessible from any stream
 - Exposes every CLI command identically via a REST API at `/api/v1/`
 - Multiple server instances can run simultaneously on different ports
-- Runs entirely from a single static binary — no runtime dependencies, no
-  internet required at runtime
+- Runs entirely from a single static binary — no runtime dependencies
 
 ---
 
@@ -39,66 +36,37 @@ Session
               └── Target ID  (the name you give a stream)
 ```
 
-**Windows** are server-managed. The browser displays one window at a time and
-shows a persistent header bar listing all window names. Switch between windows
-using the keyboard bindings (`gt` / `gT`) or by clicking the header.
+**Windows** are server-managed. The browser displays one window at a time with
+a persistent header bar listing all window names. Switch with `gt`/`gT` or by
+clicking the header.
 
-A **Target ID** is a string matching `[a-zA-Z0-9_][a-zA-Z0-9_ -]*`, max 64
-characters, that maps a data stream to a pane.
-
-A **Filter** is an external executable that transforms stream data before
-rendering (max 8 stages per chain).
-
-A **Formatter** renders a pane as HTML from the incoming stream and the current
-KV store state.
-
-A **Control Sequence** is a line in the stream with a recognised two-character
-prefix (`x:`) that triggers a side-effect instead of rendering as content.
-
----
-
-## Multiple servers
-
-Multiple rdw servers can run simultaneously on different ports. Use `--port`
-on every command to target a specific instance:
-
-```sh
-# start two servers
-rdw server start --port 7681
-rdw server start --port 7682
-
-# send data to the second server
-your_script | rdw pipe --id build-log --port 7682
-
-# list all running servers
-rdw server list
-```
-
-When `--port` is omitted, the default port (7681) is tried. If no server
-answers there, all registered instances are listed in the error message.
+A **Target ID** matches `[a-zA-Z0-9_][a-zA-Z0-9_ -]*`, max 64 characters.
 
 ---
 
 ## Project status
 
-Early implementation. The core pipeline, KV store, auth, config, layout
-schema, discovery, bindings, and CLI scaffold are complete and tested. The
-HTTP/WebSocket server, browser UI, and REST API are the next layer.
+The server, REST API, CLI, and core data pipeline are complete. The browser UI
+is a functional placeholder (connects, receives lines, renders ANSI color). The
+full interactive layout editor and formatters are next.
 
 | Package | Description | Coverage |
 | --- | --- | --- |
-| `internal/session` | TargetID validation, ScrollbackBuffer | 100% |
+| `internal/session` | TargetID, ScrollbackBuffer, Manager | 98.6% |
 | `internal/kvstore` | Session-scoped KV store | 98% |
-| `internal/control` | Inline control sequence parser | 100% |
+| `internal/control` | Control sequence parser | 100% |
 | `internal/pipeline` | Line relay, filter chain, KV dispatch | 93% |
 | `internal/auth` | SHA-256 hashed token access control | 91% |
-| `internal/config` | YAML config loader with validation | 76% |
-| `internal/layout` | Window/pane schema, YAML parser, resize | 100% |
+| `internal/router` | Target ID to pipeline mapping | 85.5% |
+| `internal/layout` | Window/pane schema, YAML parser | 100% |
 | `internal/bindings` | Keyboard binding model, vim defaults | 100% |
-| `internal/discovery` | Multi-server registry and auto-detect | 58% |
-| `internal/selftest` | In-process smoke test suite | 80% |
+| `internal/pipe` | Client-side stdin relay | 67.3% |
+| `internal/server` | HTTP/WebSocket server, full REST API | 67.9% |
+| `internal/config` | YAML config loader | 76% |
+| `internal/discovery` | Multi-server registry | 58% |
+| `internal/selftest` | In-process smoke suite (11 checks) | 75.2% |
 
-134 tests, 76.1% overall statement coverage.
+244 tests · 67.3% overall statement coverage
 
 ---
 
@@ -108,7 +76,7 @@ HTTP/WebSocket server, browser UI, and REST API are the next layer.
 go install github.com/nkh/rdw@latest
 ```
 
-Or clone and build:
+Or build from source:
 
 ```sh
 git clone https://github.com/nkh/rdw
@@ -132,60 +100,59 @@ Start the server:
 rdw server start --open-browser
 ```
 
-The server listens on port `7681` by default. The browser opens automatically.
-To run a second server:
-
-```sh
-rdw server start --port 7682 --open-browser
-```
+Listens on port `7681` by default.
 
 Send data to a pane:
 
 ```sh
-# plain text
-your_script | rdw pipe --id my-pane
+your_script | rdw pipe --id build-log
 
-# with a layout — create layout on first use, reuse on subsequent calls
-your_script | rdw pipe --id build-log --layout layouts/debug.yaml
-
-# route into a specific window by name
+# route into a named window
 your_script | rdw pipe --id build-log --window build
 
-# formatted JSON
-curl -s api.example.com/status | rdw json --id api-status
-
-# image from a file
-rdw image --id chart --path ./output.png
+# with a layout — create on first use, reuse on subsequent calls
+your_script | rdw pipe --id build-log --layout ./layouts/debug.yaml
 ```
 
 Stop the server:
 
 ```sh
 rdw server stop
+```
+
+---
+
+## Multiple servers
+
+```sh
+rdw server start --port 7681
+rdw server start --port 7682
+
+your_script | rdw pipe --id log --port 7682
+rdw server list
 rdw server stop --port 7682
 ```
+
+When `--port` is omitted, port 7681 is tried. If nothing is there, all
+registered instances are listed in the error message.
 
 ---
 
 ## Layout description language
 
-Layouts are YAML files. The server uses them to construct the pane arrangement
-in the browser when a layout is applied or first referenced.
+Layouts are YAML files with a versioned schema:
 
 ```yaml
-schema_version: 1        # required; must be 1
-name: debug              # optional preset name
+schema_version: 1
+name: debug
 
 windows:
-  - name: build          # display name shown in the window header bar
+  - name: build
     panes:
-      - target_id: stdout          # stream name routed to this pane
+      - target_id: stdout
       - target_id: stderr
-        split: h                   # h = new pane below; v = new pane to the right
-        size: 30%                  # N (columns), Npx, N%
-        group: ci                  # optional pane group
-        private: false             # hide from non-owner tokens
-        scrollback_cap: 5000       # per-pane cap (default: 10 000, max: 100 000)
+        split: h        # h = below, v = right
+        size: 30%       # N (columns), Npx, N%
 
   - name: metrics
     panes:
@@ -193,30 +160,13 @@ windows:
       - target_id: mem
         split: v
         size: 50%
-      - target_id: disk
-        split: h
-        size: 25%
 ```
 
-The first pane in each window needs no `split` field; it occupies the whole
-window until subsequent panes subdivide it.
-
-Apply a layout from the CLI:
+Apply from CLI or pass directly to `pipe`:
 
 ```sh
-# from a file
-rdw layout apply ./layouts/debug.yaml
-
-# from a saved preset
 rdw layout apply debug
-
-# create the layout interactively and save it
-rdw layout save --name debug
-```
-
-Pass a layout directly to `pipe` — if it is not already active it is created:
-
-```sh
+rdw layout apply ./layouts/debug.yaml
 your_script | rdw pipe --id build-log --layout debug
 ```
 
@@ -224,41 +174,22 @@ your_script | rdw pipe --id build-log --layout debug
 
 ## Window management
 
-Windows are server-managed views within the browser page. The browser shows
-one window at a time and a header bar lists all windows.
-
 ```sh
 rdw window create build
-rdw window create metrics
 rdw window list
 rdw window focus metrics
 rdw window rename build build-v2
 rdw window close build-v2
 ```
 
-Switch windows in the browser using the keyboard bindings or by clicking
-the header bar.
-
 ---
 
 ## Pane management
 
 ```sh
-# split vertically and assign a new target
 rdw pane split build-log v error-log
-
-# resize — columns (default), pixels, or percentage
 rdw pane resize build-log right 40%
-rdw pane resize build-log right 200px
-rdw pane resize build-log right 40
-
-# zoom a pane to full window (toggle)
 rdw pane zoom error-log
-
-# swap two panes
-rdw pane swap build-log error-log
-
-# close a pane
 rdw pane close error-log
 ```
 
@@ -266,211 +197,124 @@ rdw pane close error-log
 
 ## Keyboard bindings
 
-The browser UI is fully keyboard-driven with vim-like defaults. All bindings
-can be overridden in the configuration file under the `bindings:` section.
-
-### Window navigation
+All 32 actions have vim-like defaults. Configurable in `config.yaml`.
 
 | Key | Action |
 | --- | --- |
-| `gt` | next window |
-| `gT` | previous window |
-| `g0` | first window |
-| `g$` | last window |
-| `gn` | create new window |
-| `gx` | close active window |
-| `gr` | rename active window (opens prompt) |
+| `gt` / `gT` | next / previous window |
+| `g0` / `g$` | first / last window |
+| `gn` / `gx` / `gr` | new / close / rename window |
+| `h` / `j` / `k` / `l` | focus pane left/down/up/right |
+| `s` / `v` | split pane horizontally / vertically |
+| `H` / `J` / `K` / `L` | resize pane |
+| `q` / `z` / `R` / `x` | close / zoom / rename / swap pane |
+| `Ctrl+u` / `Ctrl+d` | scroll up/down |
+| `gg` / `G` | scroll to top / bottom |
+| `/` / `n` / `N` | search open / next / prev |
+| `Ctrl+w s` / `Ctrl+w r` | layout save / reload |
 
-### Pane navigation
-
-| Key | Action |
-| --- | --- |
-| `h` | focus pane left |
-| `j` | focus pane below |
-| `k` | focus pane above |
-| `l` | focus pane right |
-
-### Pane editing
-
-| Key | Action |
-| --- | --- |
-| `s` | split horizontally (new pane below) |
-| `v` | split vertically (new pane right) |
-| `H` | resize pane left |
-| `J` | resize pane down |
-| `K` | resize pane up |
-| `L` | resize pane right |
-| `q` | close focused pane |
-| `z` | toggle zoom (full window) |
-| `R` | rename pane target ID (opens prompt) |
-| `x` | enter swap mode: next `hjkl` picks the target to swap with |
-
-### Scrollback
-
-| Key | Action |
-| --- | --- |
-| `Ctrl+u` | scroll up |
-| `Ctrl+d` | scroll down |
-| `gg` | scroll to top |
-| `G` | scroll to bottom |
-| `Ctrl+l` | clear scrollback |
-
-### Search
-
-| Key | Action |
-| --- | --- |
-| `/` | open search |
-| `n` | next match |
-| `N` | previous match |
-
-### Layout
-
-| Key | Action |
-| --- | --- |
-| `Ctrl+w s` | save current layout |
-| `Ctrl+w l` | reload layout from disk |
-| `Escape` / `Ctrl+c` | return to normal mode |
-
-### Mouse support
-
-All pane operations are also available with the mouse:
-
-- **Drag** the gutter between panes to resize
-- **Click** a window name in the header to switch windows
-- **Double-click** a pane border to zoom
-- **Drag** a pane title bar to detach and re-attach it to another window
-- **Right-click** a pane for the context menu (clear, close, rename, etc.)
-
-### Customising bindings
-
-Override individual bindings in `~/.config/rdw/config.yaml`:
+Override any binding in `config.yaml`:
 
 ```yaml
 bindings:
   pane.focus.left:  [Left]
-  pane.focus.right: [Right]
-  pane.focus.up:    [Up]
-  pane.focus.down:  [Down]
   window.next:      [Tab]
-  window.prev:      [Shift+Tab]
-```
-
-Any action not listed in the overrides keeps its default binding. Set an
-action to an empty list to remove its binding entirely:
-
-```yaml
-bindings:
-  pane.swap: []   # disable swap mode
+  pane.swap:        []   # disable
 ```
 
 ---
 
 ## Key-value store
 
-The server maintains a session-scoped KV store. Any stream or formatter can
-read and write it.
-
 ```sh
 rdw kv set build.status passing
 rdw kv get build.status
 rdw kv delete build.status
 
-# write inline from a stream using a control sequence
-echo "=:build.status=passing;build.duration=42s" | rdw pipe --id build-log
+# inline from a stream
+echo "=:build.status=passing;duration=42s" | rdw pipe --id build-log
 
-# optional SQLite persistence across server restarts
+# SQLite persistence
 rdw server start --kv-persist ~/.rdw/kv.db
-```
-
-Keys match `[a-zA-Z0-9_][a-zA-Z0-9_ :-]*`, max 64 characters. Values are
-capped at 64 KB each; the total store is capped at 64 MB.
-
-Window- and pane-scoped keys use a prefix convention:
-
-```
-window:<window_name>:<key>
-pane:<target_id>:<key>
 ```
 
 ---
 
 ## Control sequences
 
-A line whose first two bytes are a recognised letter and a colon is a control
-sequence and is not forwarded to the renderer.
-
 | Prefix | Effect |
 | --- | --- |
-| `v:` | verbatim — send a line that looks like a control sequence as literal content |
+| `v:` | verbatim — pass through without interpretation |
 | `q:` | quit the server |
-| `s:` | semaphore — server quits when count reaches zero |
-| `c:` | clear the pane scrollback buffer |
-| `t:` | toggle timestamp prepending |
-| `f:` | set the formatter for the pane |
-| `r:` | relay output to a location |
-| `=:` | write KV pairs; multiple pairs separated by `;` |
+| `s:` | semaphore — decrement counter; quit at zero |
+| `c:` | clear scrollback |
+| `t:` | toggle timestamp |
+| `f:` | set formatter |
+| `r:` | relay output |
+| `=:` | write KV pairs (`key=val;key2=val2`) |
 
 ---
 
 ## Binary data
 
-Binary payloads must be base64-encoded with a `b64:` prefix:
-
 ```sh
 echo "b64:$(base64 < image.png)" | rdw pipe --id chart
 ```
 
+Base64 lines are decoded transparently before rendering.
+
 ---
 
-## Sharing and access control
+## Tokens and access control
 
 ```sh
-# create a token scoped to one pane, expiring in 8 hours
 rdw token create --panes build-log --expiry 8h
-
-# revoke immediately
+rdw token list
 rdw token revoke <token-id>
 ```
 
-The server is loopback-only by default. `--network-expose` at startup extends
-access to the configured network interface. Tokens are stored as SHA-256 hashes.
+CLI commands from the same Unix user that started the server authenticate
+automatically via a Unix domain socket. Remote use requires a token.
+
+The server binds to loopback only by default. `--network-expose` opts in to
+network access.
 
 ---
 
-## Exporting
+## Export
 
 ```sh
 rdw save pane --target-id build-log --out-dir ./export
 rdw save all --out-dir ./export
 ```
 
-Output is a Markdown file per window with an `assets/` subfolder for images.
-
 ---
 
 ## bash-rd compatibility
 
 ```sh
-rdw pipe --id my-pane --forward rd      # send to rd only
-rdw pipe --id my-pane --forward both    # send to both rdw and rd
+rdw pipe --id my-pane --forward rd     # rd only
+rdw pipe --id my-pane --forward both   # rdw and rd
 ```
 
-The KV store wire format, `=:key=value` control sequence syntax, and `b64:`
-binary encoding convention are identical to bash-rd.
+The `=:key=value` control sequence, `b64:` encoding, and all 8 control
+sequence prefixes are identical to bash-rd.
 
 ---
 
 ## Headless and CI use
 
 ```sh
-rdw selftest   # exits 0 on success
+rdw selftest    # exits 0 on success
 ```
+
+11 in-process checks covering all core packages including a live server ping.
 
 ---
 
 ## Configuration
 
-`~/.config/rdw/config.yaml` (pass `--config` to override):
+`~/.config/rdw/config.yaml`:
 
 ```yaml
 server:
@@ -489,12 +333,11 @@ kv:
   persist_path: ""
 
 log:
-  level: info       # debug | info | warn | error
-  format: console   # console | json
+  level: info
+  format: console
 
 bindings:
-  # override individual keys; omitted actions keep their defaults
-  # pane.focus.left: [Left]
+  # override individual keys here
 ```
 
 ---
@@ -516,9 +359,11 @@ make clean      # remove build artefacts
 
 - `rdw --help` — full command list
 - `rdw server start --help` — all server flags
-- `rdw completion bash` — bash autocompletion script
+- `rdw completion bash` — bash autocompletion
 - `man rdw` — UNIX man page (forthcoming)
-- Full functional requirements: [docs/requirements.md](docs/requirements.md)
+- [docs/manual.md](docs/manual.md) — full user manual
+- [docs/requirements.md](docs/requirements.md) — functional requirements
+- [docs/status.md](docs/status.md) — implementation status and plan
 
 ---
 
