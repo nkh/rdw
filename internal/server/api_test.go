@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -624,4 +625,251 @@ func TestAPI_Admin_Connections(t *testing.T) {
 	var body map[string]int
 	decodeJSON(t, resp, &body)
 	assert.Equal(t, 0, body["connections"])
+}
+
+// ---------------------------------------------------------------------------
+// Bindings endpoint
+// ---------------------------------------------------------------------------
+
+func TestAPI_Bindings_ReturnsJSON(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/bindings")
+	assert.Equal(t, 200, resp.StatusCode)
+
+	var body map[string][]string
+	decodeJSON(t, resp, &body)
+
+	// Default bindings must include vim navigation keys.
+	assert.Contains(t, body, "pane.focus.left")
+	assert.Contains(t, body, "window.next")
+	assert.Equal(t, []string{"h"}, body["pane.focus.left"])
+}
+
+func TestAPI_Bindings_UnauthentictatedAllowed(t *testing.T) {
+	ts, _, _ := newAuthServer(t)
+	// No token — bindings is unauthed.
+	c := newAPIClient(t, ts, "")
+	resp := c.get("/api/v1/bindings")
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+}
+
+func TestAPI_Bindings_ConfigOverridesApplied(t *testing.T) {
+	cfg := config.Default()
+	cfg.Auth.NoAuth = true
+	cfg.Bindings = map[string][]string{
+		"pane.focus.left": {"Left"},
+	}
+	s := server.New(cfg, server.Options{
+		SessionID: fmt.Sprintf("bind-%d", time.Now().UnixNano()),
+	})
+	ts := httptest.NewServer(s.HTTPHandler())
+	t.Cleanup(ts.Close)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/bindings")
+	var body map[string][]string
+	decodeJSON(t, resp, &body)
+
+	// Config override applied.
+	assert.Equal(t, []string{"Left"}, body["pane.focus.left"])
+	// Other defaults still present.
+	assert.Contains(t, body, "window.next")
+}
+
+// ---------------------------------------------------------------------------
+// Groups
+// ---------------------------------------------------------------------------
+
+func setupGroup(t *testing.T, s *server.Server, winName string, panes []struct{ id, group string }) {
+	t.Helper()
+	_ = s.Manager().CreateWindow(winName)
+	for _, p := range panes {
+		id, _ := server.ParseTargetID(p.id)
+		_, _ = s.Router().Register(id, 0)
+		_ = s.Manager().AddPane(winName, &server.PaneStateExport{
+			TargetID: id,
+			Group:    p.group,
+		})
+	}
+}
+
+func TestAPI_Group_Kill(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	setupGroup(t, s, "w", []struct{ id, group string }{
+		{"p1", "ci"},
+		{"p2", "ci"},
+		{"p3", "other"},
+	})
+
+	resp := c.post("/api/v1/groups/ci/kill", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// p1 and p2 should be removed from the manager.
+	id1, _ := server.ParseTargetID("p1")
+	id2, _ := server.ParseTargetID("p2")
+	id3, _ := server.ParseTargetID("p3")
+	_, p1 := s.Manager().FindPane(id1)
+	_, p2 := s.Manager().FindPane(id2)
+	_, p3 := s.Manager().FindPane(id3)
+	assert.Nil(t, p1, "p1 should be removed")
+	assert.Nil(t, p2, "p2 should be removed")
+	assert.NotNil(t, p3, "p3 should survive")
+}
+
+func TestAPI_Group_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/groups/nonexistent/kill", nil)
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Group_Hide(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	setupGroup(t, s, "w", []struct{ id, group string }{{"p1", "mygroup"}})
+
+	resp := c.post("/api/v1/groups/mygroup/hide", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Group_Show(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	setupGroup(t, s, "w", []struct{ id, group string }{{"p1", "g"}})
+	resp := c.post("/api/v1/groups/g/show", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Group_Focus(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	setupGroup(t, s, "w", []struct{ id, group string }{{"p1", "g"}})
+	resp := c.post("/api/v1/groups/g/focus", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Pane swap
+// ---------------------------------------------------------------------------
+
+func TestAPI_Pane_Swap(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("w")
+	for _, name := range []string{"a", "b"} {
+		id, _ := server.ParseTargetID(name)
+		_, _ = s.Router().Register(id, 0)
+		_ = s.Manager().AddPane("w", &server.PaneStateExport{TargetID: id})
+	}
+
+	resp := c.post("/api/v1/panes/a/swap", map[string]string{"target": "b"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Pane_Swap_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/panes/missing/swap", map[string]string{"target": "also-missing"})
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Pane_Swap_InvalidJSON(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/panes/p/swap", map[string]string{"target": "-invalid"})
+	resp.Body.Close()
+	// Either bad request (invalid target ID) or not found (pane missing).
+	assert.True(t, resp.StatusCode == 400 || resp.StatusCode == 404)
+}
+
+// ---------------------------------------------------------------------------
+// Export endpoints
+// ---------------------------------------------------------------------------
+
+func TestAPI_Export_All(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("build")
+	outDir := t.TempDir()
+
+	resp := c.post("/api/v1/export/all", map[string]string{"out_dir": outDir})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, err := os.Stat(outDir + "/session.md")
+	assert.NoError(t, err, "session.md should be written")
+}
+
+func TestAPI_Export_Pane(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("w")
+	id, _ := server.ParseTargetID("mylog")
+	_, _ = s.Router().Register(id, 0)
+	_ = s.Manager().AddPane("w", &server.PaneStateExport{TargetID: id})
+
+	outDir := t.TempDir()
+	resp := c.post("/api/v1/export/pane", map[string]string{
+		"target_id": "mylog",
+		"out_dir":   outDir,
+	})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, err := os.Stat(outDir + "/mylog.md")
+	assert.NoError(t, err)
+}
+
+func TestAPI_Export_Pane_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/export/pane", map[string]string{
+		"target_id": "ghost",
+		"out_dir":   t.TempDir(),
+	})
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Export_Window(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("ci")
+	outDir := t.TempDir()
+	resp := c.post("/api/v1/export/window", map[string]string{
+		"name":    "ci",
+		"out_dir": outDir,
+	})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, err := os.Stat(outDir + "/ci.md")
+	assert.NoError(t, err)
+}
+
+func TestAPI_Export_Window_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+	resp := c.post("/api/v1/export/window", map[string]string{
+		"name": "ghost", "out_dir": t.TempDir(),
+	})
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
 }
