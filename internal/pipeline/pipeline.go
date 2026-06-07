@@ -233,3 +233,10 @@ func maybeDecodeBase64(line string) string {
 
 	return string(decoded)
 }
+
+// Scrollback returns the scrollback buffer associated with this pipeline.
+func (p *Pipeline) Scrollback() *session.ScrollbackBuffer {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.scrollback
+}
