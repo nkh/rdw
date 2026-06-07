@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/nkh/rdw/internal/auth"
+	"github.com/nkh/rdw/internal/bindings"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/layout"
 	"github.com/nkh/rdw/internal/session"
@@ -46,6 +47,9 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	// Session info.
 	authed("GET /api/v1/session", s.handleSession)
 
+	// Bindings config (used by browser UI to set up keyboard shortcuts).
+	unauth("GET /api/v1/bindings", http.HandlerFunc(s.handleBindings))
+
 	// Stream ingest (POST line).
 	authed("POST /api/v1/stream/{id}", s.handleStreamPost)
 
@@ -77,6 +81,20 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("GET /api/v1/tokens", s.handleTokenList)
 	authed("POST /api/v1/tokens", s.handleTokenCreate)
 	authed("DELETE /api/v1/tokens/{id}", s.handleTokenRevoke)
+
+	// Groups.
+	authed("POST /api/v1/groups/{name}/hide",  s.handleGroupAction("hide"))
+	authed("POST /api/v1/groups/{name}/show",  s.handleGroupAction("show"))
+	authed("POST /api/v1/groups/{name}/focus", s.handleGroupAction("focus"))
+	authed("POST /api/v1/groups/{name}/kill",  s.handleGroupAction("kill"))
+
+	// Pane swap.
+	authed("POST /api/v1/panes/{id}/swap", s.handlePaneSwap)
+
+	// Export (Markdown bundle).
+	authed("POST /api/v1/export/pane",   s.handleExportPane)
+	authed("POST /api/v1/export/window", s.handleExportWindow)
+	authed("POST /api/v1/export/all",    s.handleExportAll)
 
 	// Admin console.
 	admin("GET /api/v1/admin/connections", s.handleAdminConnections)
@@ -128,6 +146,24 @@ func handleFrontend(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(frontendHTML)
+}
+
+// ---------------------------------------------------------------------------
+// Bindings
+// ---------------------------------------------------------------------------
+
+// handleBindings returns the server's keyboard binding map as JSON.
+// Used by the browser UI on startup to configure its key dispatch table.
+func (s *Server) handleBindings(w http.ResponseWriter, _ *http.Request) {
+	b := bindings.Default()
+	if s.cfg.Bindings != nil {
+		overrides := make(bindings.Bindings, len(s.cfg.Bindings))
+		for action, keys := range s.cfg.Bindings {
+			overrides[bindings.Action(action)] = bindings.Binding{Keys: keys}
+		}
+		b = bindings.Merge(b, overrides)
+	}
+	jsonResponse(w, bindings.JSON(b))
 }
 
 // ---------------------------------------------------------------------------
@@ -581,4 +617,199 @@ func (s *Server) broadcastLayoutUpdate() {
 		Payload: json.RawMessage(snap),
 	})
 	s.hub.Broadcast(data)
+}
+
+// ---------------------------------------------------------------------------
+// Groups
+// ---------------------------------------------------------------------------
+
+// handleGroupAction returns a handler that performs an action on all panes
+// in a named group.
+func (s *Server) handleGroupAction(action string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		groupName := r.PathValue("name")
+		if groupName == "" {
+			apiError(w, http.StatusBadRequest, "group name required")
+			return
+		}
+
+		// Collect all panes belonging to this group.
+		var targets []session.TargetID
+		for _, win := range s.manager.Windows() {
+			for _, p := range win.Panes {
+				if p.Group == groupName {
+					targets = append(targets, p.TargetID)
+				}
+			}
+		}
+
+		if len(targets) == 0 {
+			apiError(w, http.StatusNotFound, "no panes found in group "+groupName)
+			return
+		}
+
+		switch action {
+		case "kill":
+			for _, id := range targets {
+				_ = s.manager.RemovePane(id)
+				s.router.Deregister(id)
+			}
+			s.broadcastLayoutUpdate()
+
+		case "hide", "show":
+			// Broadcast visibility toggle to browsers.
+			data, _ := json.Marshal(SpecialMessage{
+				Type: "group_" + action,
+				Payload: map[string]string{"group": groupName},
+			})
+			s.hub.Broadcast(data)
+
+		case "focus":
+			// Focus the first pane in the group.
+			if len(targets) > 0 {
+				data, _ := json.Marshal(SpecialMessage{
+					Type: "pane_focus",
+					Payload: map[string]string{"target_id": targets[0].String()},
+				})
+				s.hub.Broadcast(data)
+			}
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Pane swap
+// ---------------------------------------------------------------------------
+
+func (s *Server) handlePaneSwap(w http.ResponseWriter, r *http.Request) {
+	aStr := r.PathValue("id")
+	var body struct {
+		Target string `json:"target"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	idA, err := session.ParseTargetID(aStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid pane ID: "+err.Error())
+		return
+	}
+	idB, err := session.ParseTargetID(body.Target)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid target ID: "+err.Error())
+		return
+	}
+
+	winA, paneA := s.manager.FindPane(idA)
+	winB, paneB := s.manager.FindPane(idB)
+
+	if paneA == nil {
+		apiError(w, http.StatusNotFound, "pane "+aStr+" not found")
+		return
+	}
+	if paneB == nil {
+		apiError(w, http.StatusNotFound, "pane "+body.Target+" not found")
+		return
+	}
+
+	// Swap grid positions by exchanging Split and Size fields.
+	paneA.Split, paneB.Split = paneB.Split, paneA.Split
+	paneA.Size,  paneB.Size  = paneB.Size,  paneA.Size
+
+	_ = winA
+	_ = winB
+
+	s.broadcastLayoutUpdate()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---------------------------------------------------------------------------
+// Export
+// ---------------------------------------------------------------------------
+
+func (s *Server) handleExportPane(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		TargetID string `json:"target_id"`
+		OutDir   string `json:"out_dir"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	id, err := session.ParseTargetID(body.TargetID)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid target ID: "+err.Error())
+		return
+	}
+
+	_, pane := s.manager.FindPane(id)
+	if pane == nil {
+		apiError(w, http.StatusNotFound, "pane not found: "+body.TargetID)
+		return
+	}
+
+	outDir := body.OutDir
+	if outDir == "" {
+		outDir = "."
+	}
+
+	if err := s.exportPane(id, outDir); err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleExportWindow(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name   string `json:"name"`
+		OutDir string `json:"out_dir"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	win := s.manager.Window(body.Name)
+	if win == nil {
+		apiError(w, http.StatusNotFound, "window not found: "+body.Name)
+		return
+	}
+
+	outDir := body.OutDir
+	if outDir == "" {
+		outDir = "."
+	}
+
+	if err := s.exportWindow(win, outDir); err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleExportAll(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		OutDir string `json:"out_dir"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	outDir := body.OutDir
+	if outDir == "" {
+		outDir = "."
+	}
+
+	if err := s.exportAll(outDir); err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -14,10 +14,14 @@ const (
 
 // Config is the top-level server configuration.
 type Config struct {
-	Server ServerConfig `yaml:"server"`
-	Auth   AuthConfig   `yaml:"auth"`
-	KV     KVConfig     `yaml:"kv"`
-	Log    LogConfig    `yaml:"log"`
+	Server   ServerConfig        `yaml:"server"`
+	Auth     AuthConfig          `yaml:"auth"`
+	KV       KVConfig            `yaml:"kv"`
+	Log      LogConfig           `yaml:"log"`
+	// Bindings holds per-action key overrides. The map key is an action name
+	// (e.g. "pane.focus.left") and the value is a list of key strings.
+	// Actions not listed keep their vim-like defaults.
+	Bindings map[string][]string `yaml:"bindings,omitempty"`
 }
 
 // ServerConfig holds daemon networking and operational settings.
@@ -69,5 +73,6 @@ func Default() Config {
 			Level:  "info",
 			Format: "console",
 		},
+		Bindings: nil,
 	}
 }
