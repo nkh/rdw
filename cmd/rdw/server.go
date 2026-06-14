@@ -110,6 +110,11 @@ func runServerStart(cmd *cobra.Command, _ []string) error {
 		Restore:     restore,
 	})
 
+	if openBrowser, _ := cmd.Flags().GetBool("open-browser"); openBrowser {
+		url := fmt.Sprintf("http://127.0.0.1:%d", cfg.Server.Port)
+		_ = browser.Open(url)
+	}
+
 	return s.Run(context.Background())
 }
 

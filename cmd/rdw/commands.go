@@ -14,6 +14,7 @@ import (
 
 	"github.com/nkh/rdw/internal/discovery"
 	"github.com/nkh/rdw/internal/layout"
+	"github.com/nkh/rdw/internal/mirror"
 	pipepkg "github.com/nkh/rdw/internal/pipe"
 	"github.com/nkh/rdw/internal/selftest"
 	"github.com/nkh/rdw/internal/session"
@@ -168,7 +169,27 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 
 	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
 
-	return pipepkg.Relay(context.Background(), os.Stdin, pipepkg.Options{
+	src := io.Reader(os.Stdin)
+
+	if fwdFile, _ := cmd.Flags().GetString("forward-to-file"); fwdFile != "" {
+		sink, err := mirror.FileSync(fwdFile)
+		if err != nil {
+			return err
+		}
+
+		src = mirror.Tee(src, sink)
+	}
+
+	if fwdCmd, _ := cmd.Flags().GetString("forward-to-cmd"); fwdCmd != "" {
+		sink, err := mirror.CmdSync(fwdCmd)
+		if err != nil {
+			return err
+		}
+
+		src = mirror.Tee(src, sink)
+	}
+
+	return pipepkg.Relay(context.Background(), src, pipepkg.Options{
 		TargetID:          id,
 		Port:              resolved,
 		SocketPath:        socketPath,
