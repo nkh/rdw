@@ -10,6 +10,7 @@ import (
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/bindings"
 	"github.com/nkh/rdw/internal/format"
+	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/layout"
 	"github.com/nkh/rdw/internal/session"
@@ -99,6 +100,9 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("GET /api/v1/panes/{id}/bookmarks",        s.handleBookmarkList)
 	authed("PUT /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkAdd)
 	authed("DELETE /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkDelete)
+	authed("GET /api/v1/highlights",              s.handleHighlightList)
+	authed("PUT /api/v1/highlights/{name}",       s.handleHighlightAdd)
+	authed("DELETE /api/v1/highlights/{name}",    s.handleHighlightDelete)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -975,6 +979,42 @@ func (s *Server) handleBookmarkDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bs.Remove(r.PathValue("name")); err != nil {
+		apiError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleHighlightList returns all stored highlight profiles.
+func (s *Server) handleHighlightList(w http.ResponseWriter, _ *http.Request) {
+	jsonResponse(w, map[string]any{"profiles": s.highlights.All()})
+}
+
+// handleHighlightAdd creates or replaces a named highlight profile.
+func (s *Server) handleHighlightAdd(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+
+	var body struct {
+		Rules []highlight.Rule `json:"rules"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	p := highlight.Profile{Name: name, Rules: body.Rules}
+	if err := s.highlights.Add(p); err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleHighlightDelete removes a named highlight profile.
+func (s *Server) handleHighlightDelete(w http.ResponseWriter, r *http.Request) {
+	if err := s.highlights.Remove(r.PathValue("name")); err != nil {
 		apiError(w, http.StatusNotFound, err.Error())
 		return
 	}

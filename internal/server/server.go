@@ -17,6 +17,7 @@ import (
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/config"
 	"github.com/nkh/rdw/internal/discovery"
+	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/router"
 	"github.com/nkh/rdw/internal/session"
@@ -40,6 +41,7 @@ type Server struct {
 	rl         *RateLimiter
 	kv         *kvstore.Store
 	kvDB       *kvstore.DB // non-nil when --kv-persist is set
+	highlights *highlight.Store
 	manager    *session.Manager
 	router     *router.Router
 	httpSrv    *http.Server
@@ -70,6 +72,7 @@ func New(cfg config.Config, opts Options) *Server {
 		tokenStore: auth.NewStore(),
 		rl:         NewRateLimiter(),
 		kv:         kv,
+		highlights: highlight.New(),
 		manager:    mgr,
 		port:       port,
 		layouts:    make(map[string][]byte),
