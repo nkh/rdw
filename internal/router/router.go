@@ -19,11 +19,12 @@ type PipelineSink = pipeline.Sink
 
 // Router manages the set of active pipelines for a session.
 type Router struct {
-	mu       sync.RWMutex
-	pipes    map[session.TargetID]*pipeline.Pipeline
-	kv       *kvstore.Store
-	sinkFn   PipelineSink
-	opts     Options
+	mu        sync.RWMutex
+	pipes     map[session.TargetID]*pipeline.Pipeline
+	bookmarks map[session.TargetID]*session.BookmarkStore
+	kv        *kvstore.Store
+	sinkFn    PipelineSink
+	opts      Options
 }
 
 // Options configures the router.
@@ -51,10 +52,11 @@ func New(kv *kvstore.Store, sinkFn PipelineSink, opts Options) *Router {
 	}
 
 	return &Router{
-		pipes:  make(map[session.TargetID]*pipeline.Pipeline),
-		kv:     kv,
-		sinkFn: sinkFn,
-		opts:   opts,
+		pipes:     make(map[session.TargetID]*pipeline.Pipeline),
+		bookmarks: make(map[session.TargetID]*session.BookmarkStore),
+		kv:        kv,
+		sinkFn:    sinkFn,
+		opts:      opts,
 	}
 }
 
@@ -70,6 +72,7 @@ func (r *Router) Register(id session.TargetID, scrollbackCap int) (*pipeline.Pip
 
 	p := r.newPipeline(id, scrollbackCap)
 	r.pipes[id] = p
+	r.bookmarks[id] = session.NewBookmarkStore()
 
 	return p, nil
 }
@@ -88,6 +91,7 @@ func (r *Router) Deregister(id session.TargetID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.pipes, id)
+	delete(r.bookmarks, id)
 }
 
 // Route sends a single line to the pipeline for id.
@@ -161,6 +165,13 @@ func (r *Router) Targets() []session.TargetID {
 	}
 
 	return ids
+}
+
+// Bookmarks returns the BookmarkStore for the given Target ID, or nil.
+func (r *Router) Bookmarks(id session.TargetID) *session.BookmarkStore {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.bookmarks[id]
 }
 
 // Len returns the number of registered pipelines.

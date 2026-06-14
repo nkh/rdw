@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nkh/rdw/internal/config"
+	"github.com/nkh/rdw/internal/browser"
 	"github.com/nkh/rdw/internal/discovery"
 	"github.com/nkh/rdw/internal/server"
 	"github.com/spf13/cobra"

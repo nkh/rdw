@@ -96,6 +96,9 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("PATCH /api/v1/panes/{id}",        s.handlePaneRename)
 	unauth("GET /api/v1/formatters",           http.HandlerFunc(s.handleFormatters))
 	authed("POST /api/v1/panes/{id}/format",  s.handlePaneFormat)
+	authed("GET /api/v1/panes/{id}/bookmarks",        s.handleBookmarkList)
+	authed("PUT /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkAdd)
+	authed("DELETE /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkDelete)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -907,4 +910,74 @@ func (s *Server) handlePaneFormat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, map[string]string{"html": html})
+}
+
+// handleBookmarkList returns all bookmarks for a pane, sorted by line index.
+func (s *Server) handleBookmarkList(w http.ResponseWriter, r *http.Request) {
+	id, err := session.ParseTargetID(r.PathValue("id"))
+	if err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	bs := s.router.Bookmarks(id)
+	if bs == nil {
+		apiError(w, http.StatusNotFound, "pane not found: "+r.PathValue("id"))
+		return
+	}
+
+	jsonResponse(w, map[string]any{"bookmarks": bs.All()})
+}
+
+// handleBookmarkAdd creates or replaces a named bookmark on a pane.
+func (s *Server) handleBookmarkAdd(w http.ResponseWriter, r *http.Request) {
+	id, err := session.ParseTargetID(r.PathValue("id"))
+	if err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var body struct {
+		LineIndex int `json:"line_index"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	bs := s.router.Bookmarks(id)
+	if bs == nil {
+		apiError(w, http.StatusNotFound, "pane not found: "+r.PathValue("id"))
+		return
+	}
+
+	name := r.PathValue("name")
+	if err := bs.Add(name, body.LineIndex); err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleBookmarkDelete removes a named bookmark from a pane.
+func (s *Server) handleBookmarkDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := session.ParseTargetID(r.PathValue("id"))
+	if err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	bs := s.router.Bookmarks(id)
+	if bs == nil {
+		apiError(w, http.StatusNotFound, "pane not found: "+r.PathValue("id"))
+		return
+	}
+
+	if err := bs.Remove(r.PathValue("name")); err != nil {
+		apiError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
