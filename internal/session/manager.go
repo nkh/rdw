@@ -16,6 +16,7 @@ const maxPanesPerWindow = 64
 // PaneState describes a live pane.
 type PaneState struct {
 	TargetID      TargetID  `json:"target_id"`
+	Label         string    `json:"label,omitempty"`
 	Group         string    `json:"group,omitempty"`
 	Private       bool      `json:"private,omitempty"`
 	ScrollbackCap int       `json:"scrollback_cap"`

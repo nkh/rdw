@@ -102,7 +102,13 @@ func runServerStart(cmd *cobra.Command, _ []string) error {
 	}
 
 	sessionID := fmt.Sprintf("%d", cfg.Server.Port)
-	s := server.New(cfg, server.Options{SessionID: sessionID})
+	persistPath, _ := cmd.Flags().GetString("kv-persist")
+	restore, _ := cmd.Flags().GetBool("restore")
+	s := server.New(cfg, server.Options{
+		SessionID:   sessionID,
+		PersistPath: persistPath,
+		Restore:     restore,
+	})
 
 	return s.Run(context.Background())
 }

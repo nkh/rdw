@@ -2,11 +2,14 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/bindings"
+	"github.com/nkh/rdw/internal/format"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/layout"
 	"github.com/nkh/rdw/internal/session"
@@ -89,7 +92,10 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("POST /api/v1/groups/{name}/kill",  s.handleGroupAction("kill"))
 
 	// Pane swap.
-	authed("POST /api/v1/panes/{id}/swap", s.handlePaneSwap)
+	authed("POST /api/v1/panes/{id}/swap",   s.handlePaneSwap)
+	authed("PATCH /api/v1/panes/{id}",        s.handlePaneRename)
+	unauth("GET /api/v1/formatters",           http.HandlerFunc(s.handleFormatters))
+	authed("POST /api/v1/panes/{id}/format",  s.handlePaneFormat)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -512,6 +518,12 @@ func (s *Server) handleKVSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.kvDB != nil {
+		if err := s.kvDB.Persist(k, body.Value); err != nil {
+			fmt.Fprintf(os.Stderr, "rdw: kv persist: %v\n", err)
+		}
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -524,6 +536,13 @@ func (s *Server) handleKVDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.kv.Delete(k)
+
+	if s.kvDB != nil {
+		if err := s.kvDB.Remove(k); err != nil {
+			fmt.Fprintf(os.Stderr, "rdw: kv remove: %v\n", err)
+		}
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -812,4 +831,80 @@ func (s *Server) handleExportAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handlePaneRename sets a display label on a pane without changing its TargetID.
+func (s *Server) handlePaneRename(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	var body struct {
+		Label string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if body.Label == "" {
+		apiError(w, http.StatusBadRequest, "label is required")
+		return
+	}
+
+	id, err := session.ParseTargetID(idStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid pane ID: "+err.Error())
+		return
+	}
+
+	_, pane := s.manager.FindPane(id)
+	if pane == nil {
+		apiError(w, http.StatusNotFound, "pane not found: "+idStr)
+		return
+	}
+
+	pane.Label = body.Label
+	s.broadcastLayoutUpdate()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleFormatters returns the list of available formatter names.
+func (s *Server) handleFormatters(w http.ResponseWriter, _ *http.Request) {
+	jsonResponse(w, map[string][]string{"formatters": format.Names()})
+}
+
+// handlePaneFormat formats a pane's scrollback through the named formatter.
+func (s *Server) handlePaneFormat(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	var body struct {
+		Formatter string `json:"formatter"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	id, err := session.ParseTargetID(idStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid pane ID: "+err.Error())
+		return
+	}
+
+	pl, ok := s.router.Get(id)
+	if !ok {
+		apiError(w, http.StatusNotFound, "pane pipeline not found: "+idStr)
+		return
+	}
+
+	f, err := format.Get(body.Formatter)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	lines := pl.Scrollback().Lines()
+	html, err := f.Format(lines)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, map[string]string{"html": html})
 }

@@ -26,7 +26,9 @@ const shutdownTimeout = 10 * time.Second
 
 // Options configures a Server beyond what is in Config.
 type Options struct {
-	SessionID string
+	SessionID   string
+	PersistPath string // path to SQLite DB for KV persistence; empty = memory-only
+	Restore     bool   // load persisted KV on startup
 }
 
 // Server is the running rdw server instance.
@@ -37,6 +39,7 @@ type Server struct {
 	tokenStore *auth.Store
 	rl         *RateLimiter
 	kv         *kvstore.Store
+	kvDB       *kvstore.DB // non-nil when --kv-persist is set
 	manager    *session.Manager
 	router     *router.Router
 	httpSrv    *http.Server
@@ -87,6 +90,21 @@ func New(cfg config.Config, opts Options) *Server {
 
 // Run starts the HTTP server and blocks until context cancelled or OS signal.
 func (s *Server) Run(ctx context.Context) error {
+	if s.opts.PersistPath != "" {
+		db, err := kvstore.OpenDB(s.opts.PersistPath)
+		if err != nil {
+			return fmt.Errorf("kv-persist: %w", err)
+		}
+
+		s.kvDB = db
+
+		if s.opts.Restore {
+			if err := db.Load(s.kv); err != nil {
+				fmt.Fprintf(os.Stderr, "rdw: warning: restore failed: %v\n", err)
+			}
+		}
+	}
+
 	ln, sockPath, err := startUnixListener(s.opts.SessionID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "rdw: warning: unix socket unavailable: %v\n", err)
@@ -160,6 +178,10 @@ func (s *Server) cleanup() {
 		_ = os.Remove(s.socketPath)
 	}
 	_ = discovery.Deregister(s.port)
+
+	if s.kvDB != nil {
+		_ = s.kvDB.Close()
+	}
 }
 
 // Accessors used by tests and CLI wiring.
