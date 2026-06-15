@@ -19,6 +19,7 @@ import (
 	"github.com/nkh/rdw/internal/discovery"
 	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/kvstore"
+	"github.com/nkh/rdw/internal/terminal"
 	"github.com/nkh/rdw/internal/router"
 	"github.com/nkh/rdw/internal/session"
 )
@@ -42,6 +43,8 @@ type Server struct {
 	kv         *kvstore.Store
 	kvDB       *kvstore.DB // non-nil when --kv-persist is set
 	highlights *highlight.Store
+	terminals  *terminal.Manager
+	cycleCancel context.CancelFunc // non-nil while a focus cycle is running
 	manager    *session.Manager
 	router     *router.Router
 	httpSrv    *http.Server
@@ -73,6 +76,7 @@ func New(cfg config.Config, opts Options) *Server {
 		rl:         NewRateLimiter(),
 		kv:         kv,
 		highlights: highlight.New(),
+		terminals:  terminal.New(port + 1000),
 		manager:    mgr,
 		port:       port,
 		layouts:    make(map[string][]byte),

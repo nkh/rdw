@@ -171,6 +171,14 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 
 	src := io.Reader(os.Stdin)
 
+	// --forward rd|rdw|both: tee to bash-rd via its socket/protocol.
+	if fwdMode, _ := cmd.Flags().GetString("forward"); fwdMode == "rd" || fwdMode == "both" {
+		rdSink, err := mirror.CmdSync("rd 2>/dev/null || true")
+		if err == nil {
+			src = mirror.Tee(src, rdSink)
+		}
+	}
+
 	if fwdFile, _ := cmd.Flags().GetString("forward-to-file"); fwdFile != "" {
 		sink, err := mirror.FileSync(fwdFile)
 		if err != nil {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,8 +10,10 @@ import (
 
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/bindings"
+	"github.com/nkh/rdw/internal/cycle"
 	"github.com/nkh/rdw/internal/format"
 	"github.com/nkh/rdw/internal/highlight"
+	"github.com/nkh/rdw/internal/terminal"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/layout"
 	"github.com/nkh/rdw/internal/session"
@@ -103,6 +106,10 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("GET /api/v1/highlights",              s.handleHighlightList)
 	authed("PUT /api/v1/highlights/{name}",       s.handleHighlightAdd)
 	authed("DELETE /api/v1/highlights/{name}",    s.handleHighlightDelete)
+	authed("POST /api/v1/panes/{id}/terminal",    s.handleTerminalLaunch)
+	authed("DELETE /api/v1/panes/{id}/terminal",  s.handleTerminalKill)
+	authed("POST /api/v1/cycle/start",            s.handleCycleStart)
+	authed("POST /api/v1/cycle/stop",             s.handleCycleStop)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -1019,5 +1026,94 @@ func (s *Server) handleHighlightDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleTerminalLaunch starts a restricted terminal subprocess for a pane.
+// The response includes the local port the terminal listens on.
+func (s *Server) handleTerminalLaunch(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var body struct {
+		Cmd string `json:"cmd"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	port, err := s.terminals.Launch(id, body.Cmd)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonResponse(w, map[string]any{
+		"id":   id,
+		"port": port,
+		"url":  fmt.Sprintf("http://127.0.0.1:%d", port),
+	})
+}
+
+// handleTerminalKill stops a running terminal pane subprocess.
+func (s *Server) handleTerminalKill(w http.ResponseWriter, r *http.Request) {
+	if err := s.terminals.Kill(r.PathValue("id")); err != nil {
+		apiError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// terminalForTest exposes the terminal manager for integration tests.
+func (s *Server) terminalForTest() *terminal.Manager { return s.terminals }
+
+// handleCycleStart begins focus-cycle rotation across the supplied window list.
+func (s *Server) handleCycleStart(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Windows  []string `json:"windows"`
+		Interval int      `json:"interval_ms"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	if body.Interval <= 0 {
+		body.Interval = 5000
+	}
+
+	c, err := cycle.New(body.Windows, time.Duration(body.Interval)*time.Millisecond)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Stop any existing cycle.
+	if s.cycleCancel != nil {
+		s.cycleCancel()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cycleCancel = cancel
+
+	ch := c.Run(ctx)
+
+	go func() {
+		for ev := range ch {
+			_ = s.manager.FocusWindow(ev.Window)
+			s.broadcastLayoutUpdate()
+		}
+	}()
+
+	jsonResponse(w, map[string]any{"windows": body.Windows, "interval_ms": body.Interval})
+}
+
+// handleCycleStop stops the running focus cycle, if any.
+func (s *Server) handleCycleStop(w http.ResponseWriter, _ *http.Request) {
+	if s.cycleCancel == nil {
+		apiError(w, http.StatusConflict, "no cycle running")
+		return
+	}
+
+	s.cycleCancel()
+	s.cycleCancel = nil
 	w.WriteHeader(http.StatusNoContent)
 }
