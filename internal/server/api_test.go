@@ -14,6 +14,7 @@ import (
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/config"
 	"github.com/nkh/rdw/internal/server"
+	"github.com/nkh/rdw/internal/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +58,14 @@ func (c *apiClient) get(path string) *http.Response    { return c.do("GET", path
 func (c *apiClient) post(path string, b interface{}) *http.Response { return c.do("POST", path, b) }
 func (c *apiClient) put(path string, b interface{}) *http.Response  { return c.do("PUT", path, b) }
 func (c *apiClient) del(path string) *http.Response   { return c.do("DELETE", path, nil) }
+
+func mustID(s string) session.TargetID {
+	id, err := session.ParseTargetID(s)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
 func (c *apiClient) patch(path string, b interface{}) *http.Response { return c.do("PATCH", path, b) }
 
 func decodeJSON(t *testing.T, resp *http.Response, v interface{}) {
@@ -872,4 +881,268 @@ func TestAPI_Export_Window_NotFound(t *testing.T) {
 	})
 	resp.Body.Close()
 	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Highlight profiles
+// ---------------------------------------------------------------------------
+
+func TestAPI_Highlight_AddListDelete(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	// Add a profile.
+	resp := c.put("/api/v1/highlights/errors", map[string]interface{}{
+		"rules": []map[string]string{
+			{"pattern": `ERROR`, "class": "hl-error"},
+			{"pattern": `WARN\w+`, "class": "hl-warn"},
+		},
+	})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// List.
+	var body map[string]interface{}
+	resp = c.get("/api/v1/highlights")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	profiles := body["profiles"].([]interface{})
+	assert.Len(t, profiles, 1)
+
+	// Delete.
+	resp = c.del("/api/v1/highlights/errors")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// Gone.
+	resp = c.get("/api/v1/highlights")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Empty(t, body["profiles"])
+}
+
+func TestAPI_Highlight_BadPattern(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.put("/api/v1/highlights/bad", map[string]interface{}{
+		"rules": []map[string]string{{"pattern": `[invalid`, "class": "x"}},
+	})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+func TestAPI_Highlight_DeleteMissing(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.del("/api/v1/highlights/nope")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Pane zoom and rename
+// ---------------------------------------------------------------------------
+
+func TestAPI_Pane_Zoom(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("zoom1"), ScrollbackCap: 100})
+
+	resp := c.post("/api/v1/panes/zoom1/zoom", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Pane_Rename(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("ren1"), ScrollbackCap: 100})
+
+	resp := c.patch("/api/v1/panes/ren1", map[string]string{"label": "My Pane"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// Verify label stored.
+	_, pane := s.Manager().FindPane(mustID("ren1"))
+	require.NotNil(t, pane)
+	assert.Equal(t, "My Pane", pane.Label)
+}
+
+func TestAPI_Pane_Rename_EmptyLabel(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("ren2"), ScrollbackCap: 100})
+
+	resp := c.patch("/api/v1/panes/ren2", map[string]string{"label": ""})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
+
+func TestAPI_Formatters_List(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	var body map[string]interface{}
+	resp := c.get("/api/v1/formatters")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+
+	names := body["formatters"].([]interface{})
+	assert.Greater(t, len(names), 3)
+}
+
+func TestAPI_Pane_Format(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("fmt1"), ScrollbackCap: 100})
+	s.Router().Register(mustID("fmt1"), 100)
+
+	resp := c.post("/api/v1/panes/fmt1/format", map[string]string{"formatter": "text"})
+	var body map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Contains(t, body["html"].(string), "<pre")
+}
+
+func TestAPI_Pane_Format_Unknown(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("fmt2"), ScrollbackCap: 100})
+	s.Router().Register(mustID("fmt2"), 100)
+
+	resp := c.post("/api/v1/panes/fmt2/format", map[string]string{"formatter": "nope"})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Cycle
+// ---------------------------------------------------------------------------
+
+func TestAPI_Cycle_StartStop(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/cycle/start", map[string]interface{}{
+		"windows":     []string{"a", "b"},
+		"interval_ms": 10000,
+	})
+	var body map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, float64(10000), body["interval_ms"])
+
+	resp = c.post("/api/v1/cycle/stop", nil)
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Cycle_StopNotRunning(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/cycle/stop", nil)
+	resp.Body.Close()
+	assert.Equal(t, 409, resp.StatusCode)
+}
+
+func TestAPI_Cycle_BadWindows(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/cycle/start", map[string]interface{}{
+		"windows":     []string{},
+		"interval_ms": 1000,
+	})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Bookmarks
+// ---------------------------------------------------------------------------
+
+func TestAPI_Bookmark_AddListDelete(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{TargetID: mustID("bm1"), ScrollbackCap: 100})
+	s.Router().Register(mustID("bm1"), 100)
+
+	// Add.
+	resp := c.put("/api/v1/panes/bm1/bookmarks/start", map[string]int{"line_index": 0})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	resp = c.put("/api/v1/panes/bm1/bookmarks/end", map[string]int{"line_index": 99})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	// List.
+	var body map[string]interface{}
+	resp = c.get("/api/v1/panes/bm1/bookmarks")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	bms := body["bookmarks"].([]interface{})
+	assert.Len(t, bms, 2)
+
+	// Delete.
+	resp = c.del("/api/v1/panes/bm1/bookmarks/start")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	resp = c.get("/api/v1/panes/bm1/bookmarks")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Len(t, body["bookmarks"].([]interface{}), 1)
+}
+
+func TestAPI_Bookmark_PaneNotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/panes/ghost/bookmarks")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Loopback guard
+// ---------------------------------------------------------------------------
+
+func TestAPI_AdminLoopback_PermitsLocalhost(t *testing.T) {
+	cfg := config.Default()
+	cfg.Auth.NoAuth = true
+	cfg.Auth.AdminLocalOnly = true
+	s := server.New(cfg, server.Options{SessionID: "lb-test"})
+	ts := httptest.NewServer(s.HTTPHandler())
+	defer ts.Close()
+
+	// httptest connections always come from 127.0.0.1 — loopback should be permitted.
+	c := newAPIClient(t, ts, "")
+	resp := c.get("/api/v1/admin/connections")
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
 }
