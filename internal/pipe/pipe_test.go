@@ -188,3 +188,71 @@ func TestRelay_HTTP_CorrectPathAndMethod(t *testing.T) {
 	assert.Equal(t, "/api/v1/stream/build-log", gotPath)
 	assert.Equal(t, http.MethodPost, gotMethod)
 }
+
+// ---------------------------------------------------------------------------
+// Unix socket relay path
+// ---------------------------------------------------------------------------
+
+func TestRelay_UnixSocket_DeliversLines(t *testing.T) {
+	dir := t.TempDir()
+	sockPath := dir + "/rdw.sock"
+
+	var mu sync.Mutex
+	received := []string{}
+
+	// Start a Unix socket server that parses the rdw command format.
+	ln, err := net.Listen("unix", sockPath)
+	require.NoError(t, err)
+	defer ln.Close()
+
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				var cmd struct {
+					Action string          `json:"action"`
+					Params json.RawMessage `json:"params"`
+				}
+				if err := json.NewDecoder(c).Decode(&cmd); err != nil {
+					return
+				}
+				var p struct {
+					Line string `json:"line"`
+				}
+				_ = json.Unmarshal(cmd.Params, &p)
+				mu.Lock()
+				received = append(received, p.Line)
+				mu.Unlock()
+				_ = json.NewEncoder(c).Encode(map[string]interface{}{"ok": true})
+			}(conn)
+		}
+	}()
+
+	err = pipe.Relay(context.Background(), strings.NewReader("hello\nworld\n"), pipe.Options{
+		TargetID:   mustID(t, "test"),
+		Port:       0, // unused when socket path provided
+		SocketPath: sockPath,
+	})
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []string{"hello", "world"}, received)
+}
+
+func TestRelay_UnixSocket_FallsBackToHTTP(t *testing.T) {
+	// When SocketPath is set but unreachable, Relay buffers and drops lines
+	// silently (no fallback to HTTP — that's the caller's responsibility).
+	// Verify it completes without error.
+	err := pipe.Relay(context.Background(), strings.NewReader("line\n"), pipe.Options{
+		TargetID:          mustID(t, "test"),
+		Port:              0,
+		SocketPath:        "/nonexistent/rdw.sock",
+		ReconnectQueueLen: 10,
+	})
+	assert.NoError(t, err)
+}

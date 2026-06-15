@@ -2,6 +2,9 @@ package discovery_test
 
 import (
 	"encoding/json"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,4 +181,38 @@ func TestPruneStale_RemovesDeadProcesses(t *testing.T) {
 	servers, _ := discovery.ReadRegistry()
 	require.Len(t, servers, 1)
 	assert.Equal(t, 8001, servers[0].Port)
+}
+
+func TestResolve_SpecificPort_Live(t *testing.T) {
+	// Start a minimal HTTP server that answers /api/v1/ping.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	port := srv.Listener.Addr().(*net.TCPAddr).Port
+	got, err := discovery.Resolve(port)
+	require.NoError(t, err)
+	assert.Equal(t, port, got)
+}
+
+func TestResolve_SpecificPort_Dead(t *testing.T) {
+	// Pick a port that nothing is listening on.
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	_, err := discovery.Resolve(port)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no rdw server responding")
+}
+
+func TestResolve_ZeroPort_NoServer(t *testing.T) {
+	// Ensure neither the default port nor any registry entry is live.
+	// We simply call with port=0 when no server is running; it should
+	// return an error (either "no server on default port" or "use --port").
+	_, err := discovery.Resolve(0)
+	assert.Error(t, err)
 }

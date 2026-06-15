@@ -155,3 +155,64 @@ func TestBundle_CustomFilename(t *testing.T) {
 	_, err := os.Stat(filepath.Join(outDir, "custom.md"))
 	assert.NoError(t, err)
 }
+
+// ---------------------------------------------------------------------------
+// sniffImageExt via Bundle (indirect coverage)
+// ---------------------------------------------------------------------------
+
+func TestBundle_ImageTypes(t *testing.T) {
+	// PNG magic bytes
+	pngData := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+	// JPEG magic bytes
+	jpgData := []byte{0xFF, 0xD8, 0xFF, 0xE0}
+	// GIF magic bytes
+	gifData := []byte("GIF89a\x01\x00\x01\x00")
+	// SVG
+	svgData := []byte("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>")
+	// Unknown
+	binData := []byte{0x00, 0x01, 0x02, 0x03}
+
+	extTests := []struct {
+		name    string
+		data    []byte
+		extWant string
+	}{
+		{"png", pngData, ".png"},
+		{"jpg", jpgData, ".jpg"},
+		{"gif", gifData, ".gif"},
+		{"svg", svgData, ".svg"},
+		{"bin", binData, ".bin"},
+	}
+
+	for _, tc := range extTests {
+		t.Run(tc.name, func(t *testing.T) {
+			b64line := "b64:" + base64.StdEncoding.EncodeToString(tc.data)
+			outDir := t.TempDir()
+
+			windows := []export.WindowExport{
+				{
+					Name: "w",
+					Panes: []export.PaneExport{
+						{TargetID: "img", Lines: []string{b64line}},
+					},
+				},
+			}
+
+			err := export.Bundle(windows, outDir, "img.md")
+			require.NoError(t, err)
+
+			entries, _ := os.ReadDir(filepath.Join(outDir, "assets"))
+			found := false
+			for _, e := range entries {
+				if filepath.Ext(e.Name()) == tc.extWant {
+					found = true
+					break
+				}
+			}
+			// SVG and known types should produce an asset file.
+			if tc.extWant != ".bin" {
+				assert.True(t, found, "expected asset with ext %s", tc.extWant)
+			}
+		})
+	}
+}
