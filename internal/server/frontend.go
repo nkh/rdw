@@ -1204,6 +1204,39 @@ search_inp.addEventListener('keydown', function(e) {
   if (e.key === 'N')      { e.stopPropagation(); navigateSearch(-1); }
 });
 
+// CSV table sort — click a <th> to sort ascending, click again for descending.
+document.addEventListener('click', function(e) {
+  var th = e.target.closest('th');
+  if (!th) return;
+  var table = th.closest('table');
+  if (!table || !table.classList.contains('rdw-csv-table')) return;
+
+  var tbody = table.querySelector('tbody');
+  if (!tbody) return;
+
+  var col = Array.from(th.parentNode.children).indexOf(th);
+  var asc  = th.dataset.sortDir !== 'asc';
+
+  Array.from(th.parentNode.querySelectorAll('th')).forEach(function(h) {
+    delete h.dataset.sortDir;
+    h.classList.remove('sort-asc', 'sort-desc');
+  });
+
+  th.dataset.sortDir = asc ? 'asc' : 'desc';
+  th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort(function(a, b) {
+    var av = (a.children[col] || {}).textContent || '';
+    var bv = (b.children[col] || {}).textContent || '';
+    var an = parseFloat(av), bn = parseFloat(bv);
+    var cmp = (!isNaN(an) && !isNaN(bn)) ? (an - bn) : av.localeCompare(bv);
+    return asc ? cmp : -cmp;
+  });
+
+  rows.forEach(function(r) { tbody.appendChild(r); });
+});
+
 })();
 </script>
 </body>

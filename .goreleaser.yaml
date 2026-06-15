@@ -1,0 +1,65 @@
+version: 2
+
+project_name: rdw
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: rdw
+    main: ./main
+    binary: rdw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: rdw
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - docs/*
+      - man/rdw.1
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  github:
+    owner: nkh
+    name: rdw
+  draft: false
+  prerelease: auto
+  name_template: "rdw {{.Version}}"
+
+brews:
+  - name: rdw
+    homepage: https://github.com/nkh/rdw
+    description: Pipe process output into a live browser layout
+    repository:
+      owner: nkh
+      name: homebrew-tap
+    install: |
+      bin.install "rdw"
+      man1.install "rdw.1"

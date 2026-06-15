@@ -1,0 +1,199 @@
+.TH RDW 1 "2025" "rdw" "User Commands"
+.SH NAME
+rdw \- pipe process output into a live browser layout
+.SH SYNOPSIS
+.B rdw
+[\fB\-\-port\fR \fIPORT\fR]
+.I command
+[\fIoptions\fR]
+.SH DESCRIPTION
+.B rdw
+is a daemon that receives line-oriented output from one or more processes
+and displays it in a live multi-pane browser layout.
+Panes are identified by a Target ID and updated in real time over WebSocket.
+.PP
+The server embeds a single-page browser application. No external assets are
+needed; the binary is self-contained.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+TCP port to connect to or listen on (default: 7681).
+When multiple servers are running use this flag on every command to address
+the correct instance.
+.SH COMMANDS
+.SS Server management
+.TP
+.B rdw server start
+Start the rdw server. Options:
+.RS
+.TP
+.B \-\-open\-browser
+Open the browser UI immediately after the server starts.
+.TP
+.B \-\-kv\-persist \fIPATH\fR
+Enable SQLite KV persistence at \fIPATH\fR.
+.TP
+.B \-\-restore
+On startup, load the KV store from the SQLite database specified by
+\fB\-\-kv\-persist\fR.
+.TP
+.B \-\-no\-auth
+Disable token authentication (development use only).
+.RE
+.TP
+.B rdw server stop
+Stop the running server.
+.TP
+.B rdw server list
+List all running rdw server instances.
+.SS Piping data
+.TP
+.B rdw pipe \-\-id \fITARGET_ID\fR
+Read from stdin and relay lines to the pane identified by \fITARGET_ID\fR.
+.RS
+.TP
+.B \-\-layout \fINAME\fR
+Apply the named layout before streaming begins.
+.TP
+.B \-\-window \fINAME\fR
+Route the stream to a specific window.
+.TP
+.B \-\-forward rd|rdw|both
+In addition to rdw, forward stdin to bash-rd (\fBrd\fR), rdw only, or both.
+.TP
+.B \-\-forward\-to\-file \fIPATH\fR
+Mirror the stream to a file or FIFO.
+.TP
+.B \-\-forward\-to\-cmd \fICMD\fR
+Mirror the stream as stdin to a shell command.
+.RE
+.SS Window management
+.TP
+.B rdw window create \fINAME\fR
+Create a new window.
+.TP
+.B rdw window close \fINAME\fR
+Close a window (blocked if it is the last one).
+.TP
+.B rdw window rename \fIOLD\fR \fINEW\fR
+Rename a window.
+.TP
+.B rdw window focus \fINAME\fR
+Switch the browser view to the named window.
+.TP
+.B rdw window list
+List all windows and their panes.
+.SS Pane management
+.TP
+.B rdw pane split \fIID\fR [\fB\-\-dir h|v\fR]
+Split an existing pane horizontally or vertically.
+.TP
+.B rdw pane resize \fIID\fR \fISIZE\fR
+Resize a pane. \fISIZE\fR is \fIN\fR (columns/rows), \fINpx\fR (pixels),
+or \fIN%\fR (percentage).
+.TP
+.B rdw pane zoom \fIID\fR
+Toggle zoom on a pane.
+.TP
+.B rdw pane swap \fIID1\fR \fIID2\fR
+Swap the positions of two panes.
+.TP
+.B rdw pane close \fIID\fR
+Remove a pane.
+.SS KV store
+.TP
+.B rdw kv set \fIKEY\fR \fIVALUE\fR
+Set a KV entry. Keys follow the pattern
+.IR [a-zA-Z0-9_][a-zA-Z0-9_ -]* ,
+with an optional \fIwindow:\fR or \fIpane:\fR namespace prefix.
+.TP
+.B rdw kv get \fIKEY\fR
+Print the value of a KV entry.
+.TP
+.B rdw kv delete \fIKEY\fR
+Delete a KV entry.
+.TP
+.B rdw kv list [\fIPREFIX\fR]
+List KV keys, optionally filtered by prefix.
+.SS Token management
+.TP
+.B rdw token create [\fB\-\-scope \fISCOPE\fR] [\fB\-\-expires \fIDURATION\fR]
+Create an auth token. The plain-text token is printed once only.
+.TP
+.B rdw token revoke \fITOKEN_ID\fR
+Revoke a token immediately.
+.SS Layout management
+.TP
+.B rdw layout apply \fINAME\fR|\fIPATH\fR
+Apply a saved or on-disk layout to the current session.
+.TP
+.B rdw layout save \fINAME\fR
+Snapshot the current layout under \fINAME\fR.
+.TP
+.B rdw layout list
+List saved layouts.
+.SS Export
+.TP
+.B rdw save \fIDIR\fR [\fB\-\-pane \fIID\fR] [\fB\-\-window \fINAME\fR]
+Export scrollback to a Markdown bundle under \fIDIR\fR. Images are saved as
+files in an \fIassets/\fR subdirectory.
+.SS Diagnostics
+.TP
+.B rdw selftest
+Run the in-process smoke suite and exit 0 if all checks pass.
+.SH CONTROL SEQUENCES
+Lines written to
+.B rdw pipe
+may embed inline control sequences.
+All sequences use the form \fIPREFIX\fBkey\fR:\fIvalue\fR.
+.TP
+.B kv:\fIkey\fR=\fIvalue\fR
+Set a KV entry from the stream.
+.TP
+.B f:\fIformatter\fR
+Switch the pane formatter (text, json, yaml, markdown, csv, image).
+.TP
+.B b64:\fIDATA\fR
+Decode base64 data; used with the image formatter.
+.TP
+.B ts:
+Prepend an ISO-8601 timestamp to the following line.
+.TP
+.B v:\fIDATA\fR
+Verbatim passthrough — the remainder of the line is never interpreted as a
+control sequence.
+.TP
+.B hl:\fIPROFILE\fR
+Apply the named highlight profile to the pane.
+.TP
+.B bm:\fINAME\fR
+Create a scrollback bookmark at the current line.
+.TP
+.B sc:\fIACTION\fR
+Scrollback control: \fBclear\fR, \fBtop\fR, \fBbottom\fR.
+.SH AUTHENTICATION
+The server requires a Bearer token on all authenticated endpoints.
+Tokens are stored SHA-256 hashed; the plain-text value is shown once at
+creation and never again.
+.PP
+The Unix domain socket at
+.I $XDG_RUNTIME_DIR/rdw/<session_id>.sock
+accepts connections from the local user without a token.
+.SH ENVIRONMENT
+.TP
+.B XDG_RUNTIME_DIR
+Base directory for the Unix socket. Defaults to \fI/run/user/<uid>\fR.
+.TP
+.B XDG_CACHE_HOME
+Base directory for the server registry. Defaults to \fI$HOME/.cache\fR.
+.SH FILES
+.TP
+.I $XDG_CACHE_HOME/rdw/servers.json
+Registry of running rdw instances.
+.TP
+.I $XDG_RUNTIME_DIR/rdw/<id>.sock
+Unix socket for the session identified by \fIid\fR.
+.SH SEE ALSO
+.BR rd (1)
+.SH AUTHORS
+rdw was written by nkh. Source: https://github.com/nkh/rdw

@@ -178,3 +178,43 @@ Formatter endpoints: `GET /api/v1/formatters`, `POST /api/v1/panes/{id}/format`.
 - `PATCH /api/v1/panes/{id}` sets `pane.Label` and broadcasts `layout_update`
 
 317 tests, 67.2% coverage, 11/11 selftest.
+
+## Session 9 — Jun 15 (restoration complete)
+
+**gotty terminal pane** (`internal/terminal`)
+
+- `Manager` tracks active subprocesses and allocates ports from a base offset
+- `Launch(id, cmd)` runs `ttyd --once su -s /bin/sh nobody -c cmd`; falls back to socat for environments without ttyd; fails loudly if neither is available
+- `Kill(id)` stops the process and frees the slot
+- `POST /api/v1/panes/{id}/terminal` — launches and returns `{id, port, url}`
+- `DELETE /api/v1/panes/{id}/terminal` — kills the subprocess
+
+**Focus cycle automation** (`internal/cycle`)
+
+- `Cycle` holds an ordered window list and a dwell interval
+- `Run(ctx)` sends `Event{Window}` on a channel, advances index on each tick, closes channel on cancel
+- Wired into server as `POST /api/v1/cycle/start` and `POST /api/v1/cycle/stop`
+- Start accepts `{windows: [...], interval_ms: N}`; cancels any existing cycle before starting
+
+**bash-rd `--forward` compatibility**
+
+- `--forward rd|rdw|both` flag now wired in `runPipe`
+- `rd` and `both` modes tee stdin through `mirror.CmdSync("rd")` before relaying to rdw
+
+**Man page** (`man/rdw.1`)
+
+- Full groff man page covering all commands, options, control sequences, auth model, environment variables, and file paths
+
+**Goreleaser** (`.goreleaser.yaml`)
+
+- Linux + macOS, amd64 + arm64
+- Archives include README, docs/, man/rdw.1
+- Homebrew tap stub for `nkh/homebrew-tap`
+
+**CSV table sort** (frontend.go)
+
+- Event-delegated click handler on `rdw-csv-table` `<th>` elements
+- Numeric vs lexicographic detection via `parseFloat`
+- Toggle ascending/descending on repeated click; `sort-asc`/`sort-desc` CSS class markers
+
+327 tests, 11/11 selftest, all items from "Not yet implemented" resolved.
