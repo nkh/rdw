@@ -287,3 +287,35 @@ func (m *Manager) windowIndex(name string) int {
 
 	return -1
 }
+
+// RestoreSnapshot deserialises a JSON snapshot produced by Snapshot() and
+// replaces the current session state. Existing windows not present in the
+// snapshot are dropped; routers/pipelines for their panes are not touched
+// here — callers are responsible for reconciling the router.
+func (m *Manager) RestoreSnapshot(data []byte) error {
+	type snap struct {
+		Windows []*WindowState `json:"windows"`
+		Active  int            `json:"active_window"`
+	}
+
+	var s snap
+	if err := json.Unmarshal(data, &s); err != nil {
+		return fmt.Errorf("restore snapshot: %w", err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if s.Windows == nil {
+		s.Windows = []*WindowState{}
+	}
+
+	m.windows = s.Windows
+	m.active = s.Active
+
+	if m.active >= len(m.windows) {
+		m.active = 0
+	}
+
+	return nil
+}

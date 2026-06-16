@@ -465,7 +465,7 @@ func (s *Server) handleLayoutApply(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 
 	s.layoutMu.RLock()
-	_, exists := s.layouts[name]
+	snap, exists := s.layouts[name]
 	s.layoutMu.RUnlock()
 
 	if !exists {
@@ -473,8 +473,11 @@ func (s *Server) handleLayoutApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Applying a saved layout snapshot is a no-op in the current implementation
-	// (layouts created interactively are already live). Future: restore from snapshot.
+	if err := s.manager.RestoreSnapshot(snap); err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	s.broadcastLayoutUpdate()
 	w.WriteHeader(http.StatusNoContent)
 }

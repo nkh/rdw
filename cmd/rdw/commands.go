@@ -455,11 +455,17 @@ var paneSwapCmd = &cobra.Command{
 	Short: "Swap the positions of two panes",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Swap is a compound operation: split, move content, close old.
-		// For now delegated to the server via a dedicated endpoint (Phase 3 extension).
-		fmt.Fprintf(os.Stderr, "swap %q <-> %q: not yet wired (Phase 3 extension)\n",
-			args[0], args[1])
-		return nil
+		port, _ := cmd.Root().PersistentFlags().GetInt("port")
+		rc, err := newRestClient(port)
+		if err != nil {
+			return err
+		}
+		resp, err := rc.post("/api/v1/panes/"+args[0]+"/swap",
+			map[string]string{"target": args[1]})
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusNoContent)
 	},
 }
 
