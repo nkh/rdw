@@ -120,3 +120,39 @@ func TestKVPairs_ValueContainsEquals(t *testing.T) {
 	assert.Equal(t, "url", pairs[0][0])
 	assert.Equal(t, "https://example.com/path?a=1", pairs[0][1])
 }
+
+func TestParse_Base64(t *testing.T) {
+	seq, ok := control.Parse("b64:aGVsbG8=")
+	require.True(t, ok)
+	assert.Equal(t, control.KindBase64, seq.Kind)
+	assert.Equal(t, "aGVsbG8=", seq.Payload)
+}
+
+func TestParse_Bookmark(t *testing.T) {
+	seq, ok := control.Parse("bm:section_start")
+	require.True(t, ok)
+	assert.Equal(t, control.KindBookmark, seq.Kind)
+	assert.Equal(t, "section_start", seq.Payload)
+}
+
+func TestParse_Highlight(t *testing.T) {
+	seq, ok := control.Parse("hl:errors")
+	require.True(t, ok)
+	assert.Equal(t, control.KindHighlight, seq.Kind)
+	assert.Equal(t, "errors", seq.Payload)
+}
+
+func TestParse_ScrollbackCtl(t *testing.T) {
+	for _, action := range []string{"clear", "top", "bottom"} {
+		seq, ok := control.Parse("sc:" + action)
+		require.True(t, ok, action)
+		assert.Equal(t, control.KindScrollback, seq.Kind)
+		assert.Equal(t, action, seq.Payload)
+	}
+}
+
+func TestParse_MultiCharPrefixNoConflict(t *testing.T) {
+	// "b:" alone is not a known single-char prefix — must not match.
+	_, ok := control.Parse("b:data")
+	assert.False(t, ok)
+}

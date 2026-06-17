@@ -644,6 +644,23 @@ function focusRelative(dir) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Line append
 // ═══════════════════════════════════════════════════════════════════════════
+function applyHighlightProfile(targetID, rules) {
+  var el = document.getElementById('pane-' + targetID);
+  if (!el) return;
+  el.querySelectorAll('.rdw-line').forEach(function(line) {
+    var text = line.textContent;
+    rules.forEach(function(rule) {
+      try {
+        var re = new RegExp(rule.pattern, 'g');
+        text = text.replace(re, function(m) {
+          return '<span class="' + rule['class'] + '">' + m + '</span>';
+        });
+      } catch(_) {}
+    });
+    line.innerHTML = text;
+  });
+}
+
 function appendLine(targetID, text) {
   // Maintain scrollback in state.
   if (!state.scrollbacks[targetID]) state.scrollbacks[targetID] = [];
@@ -1135,6 +1152,33 @@ function connect() {
       case 'pane_zoom':
         if (msg.payload && msg.payload.target_id) {
           dispatch('pane.zoom', msg.payload.target_id);
+        }
+        break;
+
+      case 'highlight_set':
+        // Apply a named highlight profile to a pane. Store profile rules and
+        // re-highlight pane content on next render.
+        if (msg.target_id && msg.profile && msg.profile.rules) {
+          state.highlights = state.highlights || {};
+          state.highlights[msg.target_id] = msg.profile.rules;
+          applyHighlightProfile(msg.target_id, msg.profile.rules);
+        }
+        break;
+
+      case 'scrollback_ctl':
+        // sc: control actions: clear, top, bottom.
+        if (msg.target_id && msg.action) {
+          var el = document.getElementById('pane-' + msg.target_id);
+          if (!el) break;
+          if (msg.action === 'clear') {
+            el.innerHTML = '';
+            state.scrollback = state.scrollback || {};
+            state.scrollback[msg.target_id] = [];
+          } else if (msg.action === 'top') {
+            el.scrollTop = 0;
+          } else if (msg.action === 'bottom') {
+            el.scrollTop = el.scrollHeight;
+          }
         }
         break;
 
