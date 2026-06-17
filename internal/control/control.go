@@ -18,14 +18,18 @@ import (
 type Kind string
 
 const (
-	KindVerbatim  Kind = "v"
-	KindQuit      Kind = "q"
-	KindSemaphore Kind = "s"
-	KindClear     Kind = "c"
-	KindTimestamp Kind = "t"
-	KindFormatter Kind = "f"
-	KindRelay     Kind = "r"
-	KindKV        Kind = "="
+	KindVerbatim   Kind = "v"
+	KindQuit       Kind = "q"
+	KindSemaphore  Kind = "s"
+	KindClear      Kind = "c"
+	KindTimestamp  Kind = "t"
+	KindFormatter  Kind = "f"
+	KindRelay      Kind = "r"
+	KindKV         Kind = "="
+	KindBase64     Kind = "b64" // b64: prefix — payload is base64-encoded data
+	KindBookmark   Kind = "bm"  // bm: prefix — create a scrollback bookmark
+	KindHighlight  Kind = "hl"  // hl: prefix — apply a highlight profile
+	KindScrollback Kind = "sc"  // sc: prefix — scrollback control (clear/top/bottom)
 )
 
 var knownKinds = map[string]Kind{
@@ -45,6 +49,14 @@ type Sequence struct {
 	Payload string // the part after "X:"
 }
 
+// multiKinds maps multi-character prefixes (without trailing colon) to Kind.
+var multiKinds = map[string]Kind{
+	"b64": KindBase64,
+	"bm":  KindBookmark,
+	"hl":  KindHighlight,
+	"sc":  KindScrollback,
+}
+
 // Parse attempts to parse line as a control sequence.
 // Returns (seq, true) on success, or (zero, false) if the line is not a
 // control sequence.
@@ -53,6 +65,15 @@ func Parse(line string) (Sequence, bool) {
 		return Sequence{}, false
 	}
 
+	// Try multi-character prefixes first (b64:, bm:, hl:, sc:).
+	for prefix, kind := range multiKinds {
+		tag := prefix + ":"
+		if strings.HasPrefix(line, tag) {
+			return Sequence{Kind: kind, Payload: line[len(tag):]}, true
+		}
+	}
+
+	// Single-character prefix: X:
 	if line[1] != ':' {
 		return Sequence{}, false
 	}

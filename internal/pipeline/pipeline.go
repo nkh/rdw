@@ -135,6 +135,11 @@ func (p *Pipeline) processLine(raw string) error {
 			return p.dispatchContent(seq.Payload)
 		}
 
+		// Base64 lines are content, not control — decode and dispatch.
+		if seq.Kind == control.KindBase64 {
+			return p.dispatchContent("b64:" + seq.Payload)
+		}
+
 		// Handle KV sequences inline; forward everything else to the handler.
 		if seq.Kind == control.KindKV {
 			if err := p.applyKVSequence(seq); err != nil {

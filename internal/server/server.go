@@ -16,6 +16,7 @@ import (
 
 	"github.com/nkh/rdw/internal/auth"
 	"github.com/nkh/rdw/internal/config"
+	"github.com/nkh/rdw/internal/control"
 	"github.com/nkh/rdw/internal/discovery"
 	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/kvstore"
@@ -90,6 +91,56 @@ func New(cfg config.Config, opts Options) *Server {
 		AllowUnassigned:      false,
 		FilterChainMax:       cfg.Server.FilterChainMax,
 		DefaultScrollbackCap: cfg.Server.ScrollbackCap,
+	})
+
+	// Wire control sequence handler for bm:, hl:, sc: sequences.
+	s.router.SetControlHandler(func(id session.TargetID, seq control.Sequence) {
+		switch seq.Kind {
+		case control.KindBookmark:
+			if bs := s.router.Bookmarks(id); bs != nil && seq.Payload != "" {
+				// Line index is the current scrollback length.
+				pl, ok := s.router.Get(id)
+				lineIdx := 0
+				if ok {
+					lineIdx = pl.Scrollback().Len()
+				}
+				_ = bs.Add(seq.Payload, lineIdx)
+			}
+
+		case control.KindHighlight:
+			// hl:<profile-name> — send a highlight_set message to the browser.
+			if seq.Payload != "" {
+				if p, ok := s.highlights.Get(seq.Payload); ok {
+					type hlMsg struct {
+						Type     string      `json:"type"`
+						TargetID string      `json:"target_id"`
+						Profile  interface{} `json:"profile"`
+					}
+					data, _ := json.Marshal(hlMsg{
+						Type:     "highlight_set",
+						TargetID: id.String(),
+						Profile:  p,
+					})
+					s.hub.Broadcast(data)
+				}
+			}
+
+		case control.KindScrollback:
+			// sc:clear|top|bottom — send a scrollback_ctl message to the browser.
+			if seq.Payload != "" {
+				type scMsg struct {
+					Type     string `json:"type"`
+					TargetID string `json:"target_id"`
+					Action   string `json:"action"`
+				}
+				data, _ := json.Marshal(scMsg{
+					Type:     "scrollback_ctl",
+					TargetID: id.String(),
+					Action:   seq.Payload,
+				})
+				s.hub.Broadcast(data)
+			}
+		}
 	})
 
 	return s
