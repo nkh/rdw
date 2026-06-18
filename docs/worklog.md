@@ -218,3 +218,13 @@ Formatter endpoints: `GET /api/v1/formatters`, `POST /api/v1/panes/{id}/format`.
 - Toggle ascending/descending on repeated click; `sort-asc`/`sort-desc` CSS class markers
 
 327 tests, 11/11 selftest, all items from "Not yet implemented" resolved.
+
+## Session 10 — final fixes
+
+- `bm:`, `hl:`, `sc:`, `b64:` control sequences: parser extended to multi-char prefixes, all four dispatched in pipeline and server control handler
+- `highlight_set` and `scrollback_ctl` WebSocket messages handled in browser SPA; `applyHighlightProfile` JS function added
+- `handleLayoutApply` stub replaced with real `RestoreSnapshot` call — layout apply now reconstructs session state
+- `rdw pane swap` CLI wired to `POST /api/v1/panes/{id}/swap`
+- `strings.Title` (deprecated) replaced with `strings.ToUpper(a[:1]) + a[1:]`
+- README updated: control sequences table, bookmarks, highlights, stream mirroring, focus cycle, terminal panes sections added
+- 353 tests, 11/11 selftest, zero stubs, `go vet` clean

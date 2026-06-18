@@ -824,7 +824,7 @@ func init() {
 		a := action
 		groupCmd.AddCommand(&cobra.Command{
 			Use:   a + " <group-name>",
-			Short: strings.Title(a) + " all panes in a group",
+			Short: strings.ToUpper(a[:1]) + a[1:] + " all panes in a group",
 			Args:  cobra.ExactArgs(1),
 			RunE:  groupAction(a),
 		})

@@ -217,11 +217,107 @@ rdw completion bash
 | `f:` | set formatter |
 | `r:` | relay output |
 | `=:` | write KV pairs (`k=v;k2=v2`) |
+| `b64:` | base64-encoded binary data |
+| `bm:` | create scrollback bookmark at current line |
+| `hl:` | apply named highlight profile to pane |
+| `sc:` | scrollback control: `clear`, `top`, `bottom` |
 
 ```sh
 echo "=:build.status=passing;duration=12s" | rdw pipe --id log
 echo "v:=:literal content not a KV write" | rdw pipe --id log
+echo "bm:section_start" | rdw pipe --id log
+echo "hl:errors" | rdw pipe --id log
+echo "sc:clear" | rdw pipe --id log
 ```
+
+---
+
+## Scrollback bookmarks
+
+Bookmarks mark named positions in a pane's scrollback by line index. They can
+be set inline via `bm:` control sequences or via the API.
+
+```sh
+# Via API
+curl -X PUT http://localhost:7681/api/v1/panes/log/bookmarks/deploy \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"line_index": 142}'
+
+# List bookmarks
+curl http://localhost:7681/api/v1/panes/log/bookmarks \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Highlight profiles
+
+Named regex profiles colour-match text in the browser. Profiles are stored on
+the server and applied per-pane.
+
+```sh
+# Define a profile
+curl -X PUT http://localhost:7681/api/v1/highlights/errors \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"rules":[{"pattern":"ERROR","class":"hl-error"},{"pattern":"WARN\\w+","class":"hl-warn"}]}'
+
+# Apply to a pane via inline control sequence
+echo "hl:errors" | rdw pipe --id log
+```
+
+CSS classes `hl-error`, `hl-warn` etc. are yours to style in a custom
+stylesheet or via the config.
+
+---
+
+## Stream mirroring
+
+Mirror a stream to a file or command while simultaneously sending it to rdw.
+
+```sh
+# Mirror to file
+your_script | rdw pipe --id log --forward-to-file /tmp/debug.log
+
+# Mirror to command
+your_script | rdw pipe --id log --forward-to-cmd "grep ERROR >> errors.log"
+
+# Also forward to bash-rd
+your_script | rdw pipe --id log --forward rd
+```
+
+---
+
+## Focus cycle
+
+Automatically rotate browser focus through a list of windows at a set interval.
+Useful for wall-screen / dashboard rotation.
+
+```sh
+# Start cycling every 10 seconds
+curl -X POST http://localhost:7681/api/v1/cycle/start \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"windows":["build","logs","metrics"],"interval_ms":10000}'
+
+# Stop
+curl -X POST http://localhost:7681/api/v1/cycle/stop \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Terminal panes
+
+Launch an interactive terminal (via ttyd or socat) inside a pane running as
+the restricted `nobody` user.
+
+```sh
+curl -X POST http://localhost:7681/api/v1/panes/shell/terminal \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"cmd":"/bin/bash"}'
+# Returns {"port":8682,"url":"http://127.0.0.1:8682"}
+```
+
+Requires `ttyd` or `socat` to be installed.
 
 ---
 
