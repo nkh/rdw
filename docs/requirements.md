@@ -32,7 +32,7 @@
 
 **Forwarding Targets**
 
-- By default, the Client forwards `stdin` data exclusively to the Server.
+- By default, the Client forwards process output exclusively to the Server.
 - A configuration flag allows the Client to single-route input to `rdw` only, to `rd` (bash-rd) only, or to dual-route to both systems concurrently.
 - Backward compatibility with bash-rd is optional and requires an explicit opt-in flag.
 

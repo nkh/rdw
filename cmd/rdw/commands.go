@@ -108,8 +108,8 @@ func portFlag(cmd *cobra.Command) int {
 
 var pipeCmd = &cobra.Command{
 	Use:   "pipe",
-	Short: "Relay stdin to a named pane",
-	Long: `Read lines from stdin and forward them to the server pane identified
+	Short: "Relay process output to a named pane",
+	Long: `Read lines from the piped process output and forward them to the server pane identified
 by --id. Inline control sequences are interpreted by the server.
 
 Binary payloads must be base64-encoded with a "b64:" prefix.

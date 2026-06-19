@@ -1,8 +1,8 @@
 # rdw — Remote Display Web
 
-`rdw` pipes your program's output into a browser. Any process that can write
-to a file descriptor can stream text, images, JSON, Markdown, or CSV into a
-named pane in a multi-window layout — locally or over the network.
+`rdw` pipes process output into a browser. Any process that writes to its
+stdout can stream text, images, JSON, Markdown, or CSV into a named pane in a
+multi-window layout — locally or over the network.
 
 It is the web-native successor to [bash-rd](https://github.com/nkh/bash-rd),
 rewritten in Go as a self-contained binary with a persistent daemon,
@@ -16,7 +16,7 @@ your_script | rdw pipe --id build-log
 
 ## What it does
 
-- Routes `stdin` from any process to a named pane in the browser
+- Routes process output to named panes in the browser
 - Manages multiple windows within a single browser page (not browser tabs)
 - Supports multiple concurrent streams in split panes across multiple windows
 - Full ANSI 16/256/true-colour rendering
@@ -29,29 +29,28 @@ your_script | rdw pipe --id build-log
 
 ## Project status
 
-The server, REST API, CLI, and browser UI are complete. The browser UI supports
-keyboard-driven layout editing, search, ANSI colour, and WebSocket streaming.
-Remaining work is formatters (JSON tree, Markdown, CSV), KV persistence, and
-export.
+353 tests · 11/11 selftest checks pass · `go vet` clean
 
-| Package | Description | Coverage |
-| --- | --- | --- |
-| `internal/session` | TargetID, ScrollbackBuffer, Manager | 98.6% |
-| `internal/kvstore` | KV store | 98% |
-| `internal/control` | Control sequence parser | 100% |
-| `internal/pipeline` | Line relay, filter chain | 89.2% |
-| `internal/layout` | YAML schema | 100% |
-| `internal/bindings` | Keyboard binding model | 100% |
-| `internal/router` | Target ID to pipeline mapping | 85.5% |
-| `internal/auth` | Token access control | 90.6% |
-| `internal/export` | Markdown bundle generation | 78% |
-| `internal/server` | HTTP/WebSocket server, REST API, browser UI | 70.2% |
-| `internal/pipe` | Client-side stdin relay | 67.3% |
-| `internal/config` | Config loader | 75.8% |
-| `internal/discovery` | Multi-server registry | 58% |
-| `internal/selftest` | Smoke suite (11 checks) | 75.2% |
-
-**270 tests · 68.5% overall statement coverage · `rdw selftest` all PASS**
+| Package | Description |
+| --- | --- |
+| `internal/session` | TargetID, ScrollbackBuffer, Manager, BookmarkStore |
+| `internal/kvstore` | KV store, SQLite persistence |
+| `internal/control` | Control sequence parser (all prefixes) |
+| `internal/pipeline` | Line relay, filter chain, sinks |
+| `internal/layout` | YAML layout schema |
+| `internal/bindings` | 32 named keyboard actions |
+| `internal/router` | TargetID → pipeline routing |
+| `internal/auth` | Token access control |
+| `internal/export` | Markdown bundle export |
+| `internal/server` | HTTP/WebSocket server, REST API, browser SPA |
+| `internal/pipe` | Client-side output relay |
+| `internal/mirror` | Stream mirroring (file/command) |
+| `internal/format` | Formatters: text/json/yaml/markdown/csv/image |
+| `internal/highlight` | Regex highlight profiles |
+| `internal/cycle` | Focus cycle automation |
+| `internal/terminal` | gotty/socat terminal pane launcher |
+| `internal/discovery` | Multi-server registry |
+| `internal/browser` | Cross-platform browser open |
 
 ---
 
