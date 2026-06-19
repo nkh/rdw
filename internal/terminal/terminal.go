@@ -27,15 +27,11 @@ type Pane struct {
 type Manager struct {
 	mu    sync.Mutex
 	panes map[string]*Pane
-	next  int // next port to try
 }
 
-// New returns a Manager that allocates ports starting from base.
-func New(base int) *Manager {
-	return &Manager{
-		panes: make(map[string]*Pane),
-		next:  base,
-	}
+// New returns a Manager.
+func New() *Manager {
+	return &Manager{panes: make(map[string]*Pane)}
 }
 
 // Launch starts a restricted terminal for the given pane ID running cmd
@@ -53,8 +49,6 @@ func (m *Manager) Launch(id, cmd string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("terminal: no free port: %w", err)
 	}
-
-	// Prefer ttyd; fall back to a plain netcat echo for environments without it.
 	ttyd, ttydErr := exec.LookPath("ttyd")
 	var proc *exec.Cmd
 
@@ -131,24 +125,15 @@ func (m *Manager) All() []*Pane {
 	return out
 }
 
-// allocPort finds a free TCP port starting from m.next.
+// allocPort finds a free TCP port by letting the OS assign one.
 func (m *Manager) allocPort() (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for attempts := 0; attempts < 100; attempts++ {
-		port := m.next
-		m.next++
-
-		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-		if err != nil {
-			continue
-		}
-
-		_ = ln.Close()
-
-		return port, nil
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("no free port: %w", err)
 	}
 
-	return 0, fmt.Errorf("no free port found in range")
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+
+	return port, nil
 }

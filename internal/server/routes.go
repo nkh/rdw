@@ -1089,19 +1089,23 @@ func (s *Server) handleCycleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Stop any existing cycle.
+	s.cycleMu.Lock()
 	if s.cycleCancel != nil {
 		s.cycleCancel()
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(s.runCtx)
 	s.cycleCancel = cancel
+	s.cycleMu.Unlock()
 
 	ch := c.Run(ctx)
 
 	go func() {
 		for ev := range ch {
-			_ = s.manager.FocusWindow(ev.Window)
+			if err := s.manager.FocusWindow(ev.Window); err != nil {
+				// Window missing — log and skip; cycle continues to next window.
+				fmt.Fprintf(os.Stderr, "rdw: cycle: focus %q: %v\n", ev.Window, err)
+				continue
+			}
 			s.broadcastLayoutUpdate()
 		}
 	}()
@@ -1111,6 +1115,9 @@ func (s *Server) handleCycleStart(w http.ResponseWriter, r *http.Request) {
 
 // handleCycleStop stops the running focus cycle, if any.
 func (s *Server) handleCycleStop(w http.ResponseWriter, _ *http.Request) {
+	s.cycleMu.Lock()
+	defer s.cycleMu.Unlock()
+
 	if s.cycleCancel == nil {
 		apiError(w, http.StatusConflict, "no cycle running")
 		return

@@ -45,7 +45,9 @@ type Server struct {
 	kvDB       *kvstore.DB // non-nil when --kv-persist is set
 	highlights *highlight.Store
 	terminals  *terminal.Manager
-	cycleCancel context.CancelFunc // non-nil while a focus cycle is running
+	cycleCancel context.CancelFunc // non-nil while a focus cycle is running; guarded by cycleMu
+	cycleMu     sync.Mutex
+	runCtx      context.Context // cancelled when server shuts down
 	manager    *session.Manager
 	router     *router.Router
 	httpSrv    *http.Server
@@ -77,10 +79,11 @@ func New(cfg config.Config, opts Options) *Server {
 		rl:         NewRateLimiter(),
 		kv:         kv,
 		highlights: highlight.New(),
-		terminals:  terminal.New(port + 1000),
+		terminals:  terminal.New(),
 		manager:    mgr,
 		port:       port,
 		layouts:    make(map[string][]byte),
+		runCtx:     context.Background(),
 	}
 
 	// Create router that broadcasts rendered lines to WebSocket clients.
@@ -128,6 +131,13 @@ func New(cfg config.Config, opts Options) *Server {
 		case control.KindScrollback:
 			// sc:clear|top|bottom — send a scrollback_ctl message to the browser.
 			if seq.Payload != "" {
+				// On clear, also wipe the server-side scrollback buffer.
+				if seq.Payload == "clear" {
+					if pl, ok := s.router.Get(id); ok {
+						pl.Scrollback().Clear()
+					}
+				}
+
 				type scMsg struct {
 					Type     string `json:"type"`
 					TargetID string `json:"target_id"`
@@ -148,6 +158,8 @@ func New(cfg config.Config, opts Options) *Server {
 
 // Run starts the HTTP server and blocks until context cancelled or OS signal.
 func (s *Server) Run(ctx context.Context) error {
+	s.runCtx = ctx
+
 	if s.opts.PersistPath != "" {
 		db, err := kvstore.OpenDB(s.opts.PersistPath)
 		if err != nil {

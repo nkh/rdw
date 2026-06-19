@@ -9,25 +9,25 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	m := terminal.New(19000)
+	m := terminal.New()
 	assert.NotNil(t, m)
 	assert.Len(t, m.All(), 0)
 }
 
 func TestGet_Missing(t *testing.T) {
-	m := terminal.New(19100)
+	m := terminal.New()
 	assert.Nil(t, m.Get("nope"))
 }
 
 func TestKill_Missing(t *testing.T) {
-	m := terminal.New(19200)
+	m := terminal.New()
 	assert.Error(t, m.Kill("nope"))
 }
 
 // TestLaunch_NoTTYD verifies Launch fails cleanly when neither ttyd nor socat
 // is present. In CI both are absent so this exercises the error path.
 func TestLaunch_ErrorPath(t *testing.T) {
-	m := terminal.New(19300)
+	m := terminal.New()
 
 	// We cannot guarantee ttyd/socat presence, so we only assert the Manager
 	// state remains consistent regardless of which path is taken.
