@@ -972,3 +972,57 @@ func ifaceSliceStr(v interface{}) []string {
 	}
 	return out
 }
+
+// ---------------------------------------------------------------------------
+// rdw cycle
+// ---------------------------------------------------------------------------
+
+var cycleCmd = &cobra.Command{
+	Use:   "cycle",
+	Short: "Manage focus cycle automation",
+}
+
+var cycleStartCmd = &cobra.Command{
+	Use:   "start <window> [window ...]",
+	Short: "Rotate browser focus through windows at a fixed interval",
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		port, _ := cmd.Root().PersistentFlags().GetInt("port")
+		interval, _ := cmd.Flags().GetInt("interval-ms")
+		rc, err := newRestClient(port)
+		if err != nil {
+			return err
+		}
+		resp, err := rc.post("/api/v1/cycle/start", map[string]interface{}{
+			"windows":     args,
+			"interval_ms": interval,
+		})
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusOK)
+	},
+}
+
+var cycleStopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop the running focus cycle",
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		port, _ := cmd.Root().PersistentFlags().GetInt("port")
+		rc, err := newRestClient(port)
+		if err != nil {
+			return err
+		}
+		resp, err := rc.post("/api/v1/cycle/stop", nil)
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusNoContent)
+	},
+}
+
+func init() {
+	cycleStartCmd.Flags().Int("interval-ms", 5000, "dwell time per window in milliseconds")
+	cycleCmd.AddCommand(cycleStartCmd, cycleStopCmd)
+	rootCmd.AddCommand(cycleCmd)
+}

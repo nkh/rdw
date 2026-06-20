@@ -3,29 +3,34 @@
 rdw \- pipe process output into a live browser layout
 .SH SYNOPSIS
 .B rdw
-[\fB\-\-port\fR \fIPORT\fR]
+[\fB\-p\fR \fIPORT\fR]
 .I command
 [\fIoptions\fR]
 .SH DESCRIPTION
 .B rdw
-is a daemon that receives line-oriented output from one or more processes
-and displays it in a live multi-pane browser layout.
-Panes are identified by a Target ID and updated in real time over WebSocket.
+is a self-contained daemon that receives output from one or more processes and
+displays it in a live multi-pane browser layout.
 .PP
-The server embeds a single-page browser application. No external assets are
-needed; the binary is self-contained.
+Any process that writes to its standard output can pipe that output to
+.B rdw pipe
+and have it appear in a named pane in the browser in real time.
+The server embeds a complete single-page application; no external assets,
+network access, or CDN are required.
 .SH GLOBAL OPTIONS
 .TP
 .BR \-p ", " \-\-port " " \fIPORT\fR
 TCP port to connect to or listen on (default: 7681).
-When multiple servers are running use this flag on every command to address
-the correct instance.
+Every command accepts this flag to address a specific server instance when
+multiple servers are running simultaneously.
 .SH COMMANDS
 .SS Server management
 .TP
 .B rdw server start
-Start the rdw server. Options:
+Start the server. Options:
 .RS
+.TP
+.B \-\-port \fIPORT\fR
+TCP port to listen on (default 7681).
 .TP
 .B \-\-open\-browser
 Open the browser UI immediately after the server starts.
@@ -34,11 +39,11 @@ Open the browser UI immediately after the server starts.
 Enable SQLite KV persistence at \fIPATH\fR.
 .TP
 .B \-\-restore
-On startup, load the KV store from the SQLite database specified by
-\fB\-\-kv\-persist\fR.
+Load the persisted KV store from the SQLite database on startup.
+Requires \fB\-\-kv\-persist\fR.
 .TP
 .B \-\-no\-auth
-Disable token authentication (development use only).
+Disable token authentication. Development use only.
 .RE
 .TP
 .B rdw server stop
@@ -46,26 +51,31 @@ Stop the running server.
 .TP
 .B rdw server list
 List all running rdw server instances.
-.SS Piping data
+.SS Piping process output
 .TP
 .B rdw pipe \-\-id \fITARGET_ID\fR
-Read from stdin and relay lines to the pane identified by \fITARGET_ID\fR.
+Read lines from the piped process output and relay them to the pane identified
+by \fITARGET_ID\fR.
 .RS
 .TP
-.B \-\-layout \fINAME\fR
-Apply the named layout before streaming begins.
+.B \-\-id \fITARGET_ID\fR
+Destination pane identifier (required).
+Pattern: \fI[a-zA-Z0-9_][a-zA-Z0-9_ -]*\fR, max 64 characters.
+.TP
+.B \-\-layout \fINAME\fR|\fIPATH\fR
+Apply the named layout preset or on-disk layout file before streaming begins.
 .TP
 .B \-\-window \fINAME\fR
-Route the stream to a specific window.
+Route the stream into a specific window.
 .TP
 .B \-\-forward rd|rdw|both
-In addition to rdw, forward stdin to bash-rd (\fBrd\fR), rdw only, or both.
+Also forward the stream to bash-rd (\fBrd\fR), rdw only, or both.
 .TP
 .B \-\-forward\-to\-file \fIPATH\fR
-Mirror the stream to a file or FIFO.
+Mirror the stream to a file or FIFO simultaneously.
 .TP
 .B \-\-forward\-to\-cmd \fICMD\fR
-Mirror the stream as stdin to a shell command.
+Mirror the stream as standard input to a shell command simultaneously.
 .RE
 .SS Window management
 .TP
@@ -73,7 +83,7 @@ Mirror the stream as stdin to a shell command.
 Create a new window.
 .TP
 .B rdw window close \fINAME\fR
-Close a window (blocked if it is the last one).
+Close a window. Blocked if it is the last window in the session.
 .TP
 .B rdw window rename \fIOLD\fR \fINEW\fR
 Rename a window.
@@ -89,23 +99,23 @@ List all windows and their panes.
 Split an existing pane horizontally or vertically.
 .TP
 .B rdw pane resize \fIID\fR \fISIZE\fR
-Resize a pane. \fISIZE\fR is \fIN\fR (columns/rows), \fINpx\fR (pixels),
-or \fIN%\fR (percentage).
+Resize a pane.
+\fISIZE\fR is \fIN\fR (columns/rows), \fINpx\fR (pixels), or \fIN%\fR (percentage).
 .TP
 .B rdw pane zoom \fIID\fR
-Toggle zoom on a pane.
+Toggle full-window zoom on a pane.
 .TP
 .B rdw pane swap \fIID1\fR \fIID2\fR
-Swap the positions of two panes.
+Swap the grid positions of two panes.
 .TP
 .B rdw pane close \fIID\fR
 Remove a pane.
 .SS KV store
 .TP
 .B rdw kv set \fIKEY\fR \fIVALUE\fR
-Set a KV entry. Keys follow the pattern
-.IR [a-zA-Z0-9_][a-zA-Z0-9_ -]* ,
-with an optional \fIwindow:\fR or \fIpane:\fR namespace prefix.
+Set a KV entry.
+Keys follow \fI[a-zA-Z0-9_][a-zA-Z0-9_ -]*\fR with an optional
+\fIwindow:\fR or \fIpane:\fR namespace prefix.
 .TP
 .B rdw kv get \fIKEY\fR
 Print the value of a KV entry.
@@ -118,82 +128,154 @@ List KV keys, optionally filtered by prefix.
 .SS Token management
 .TP
 .B rdw token create [\fB\-\-scope \fISCOPE\fR] [\fB\-\-expires \fIDURATION\fR]
-Create an auth token. The plain-text token is printed once only.
+Create an auth token. The plain-text value is printed once only and never
+stored. Duration examples: \fB1h\fR, \fB24h\fR, \fB7d\fR.
 .TP
-.B rdw token revoke \fITOKEN_ID\fR
-Revoke a token immediately.
+.B rdw token revoke \fIID\fR
+Revoke a token immediately. Active WebSocket connections using that token
+are closed.
+.TP
+.B rdw token list
+List all active tokens.
 .SS Layout management
 .TP
 .B rdw layout apply \fINAME\fR|\fIPATH\fR
-Apply a saved or on-disk layout to the current session.
+Apply a saved or on-disk layout. When \fINAME\fR is given, the server looks
+up a previously saved snapshot. When \fIPATH\fR is given, the file is parsed
+as a YAML layout spec and sent to the server.
 .TP
 .B rdw layout save \fINAME\fR
-Snapshot the current layout under \fINAME\fR.
+Snapshot the current session layout under \fINAME\fR.
 .TP
 .B rdw layout list
 List saved layouts.
+.SS Group management
+.TP
+.B rdw group hide \fINAME\fR
+Hide all panes in the named group.
+.TP
+.B rdw group show \fINAME\fR
+Show all panes in the named group.
+.TP
+.B rdw group focus \fINAME\fR
+Focus all panes in the named group.
+.TP
+.B rdw group kill \fINAME\fR
+Close all panes in the named group.
+.SS Focus cycle
+.TP
+.B rdw cycle start \fIWINDOW\fR [\fIWINDOW\fR ...] [\fB\-\-interval\-ms \fIN\fR]
+Begin automatic focus rotation through the listed windows at \fIN\fR
+milliseconds per window (default 5000).
+.TP
+.B rdw cycle stop
+Stop the running focus cycle.
 .SS Export
 .TP
 .B rdw save \fIDIR\fR [\fB\-\-pane \fIID\fR] [\fB\-\-window \fINAME\fR]
-Export scrollback to a Markdown bundle under \fIDIR\fR. Images are saved as
-files in an \fIassets/\fR subdirectory.
+Export scrollback to a Markdown bundle in \fIDIR\fR.
+Decoded images are saved under \fIDIR/assets/\fR.
+Without \fB\-\-pane\fR or \fB\-\-window\fR, the entire session is exported.
 .SS Diagnostics
 .TP
 .B rdw selftest
-Run the in-process smoke suite and exit 0 if all checks pass.
+Run the 11-check in-process smoke suite. Exits 0 if all pass.
 .SH CONTROL SEQUENCES
-Lines written to
+Lines piped through
 .B rdw pipe
-may embed inline control sequences.
-All sequences use the form \fIPREFIX\fBkey\fR:\fIvalue\fR.
+that begin with a recognised prefix are intercepted and acted on rather than
+displayed in the pane.
 .TP
-.B kv:\fIkey\fR=\fIvalue\fR
-Set a KV entry from the stream.
+.B v:\fIPAYLOAD\fR
+Verbatim passthrough. Strips the prefix and displays \fIPAYLOAD\fR as-is.
+Prevents any other prefix on the line from being interpreted.
 .TP
-.B f:\fIformatter\fR
-Switch the pane formatter (text, json, yaml, markdown, csv, image).
+.B =:\fIk\fR=\fIv\fR;\fIk2\fR=\fIv2\fR
+Write key-value pairs to the session KV store.
+.TP
+.B f:\fINAME\fR
+Switch the pane's content formatter.
+Valid names: text, json, yaml, markdown, csv, image.
 .TP
 .B b64:\fIDATA\fR
-Decode base64 data; used with the image formatter.
+Base64-encoded binary data.
+Used with the image formatter or saved as an asset on export.
 .TP
-.B ts:
-Prepend an ISO-8601 timestamp to the following line.
-.TP
-.B v:\fIDATA\fR
-Verbatim passthrough — the remainder of the line is never interpreted as a
-control sequence.
+.B bm:\fINAME\fR
+Create a named scrollback bookmark at the current line index.
 .TP
 .B hl:\fIPROFILE\fR
 Apply the named highlight profile to the pane.
-.TP
-.B bm:\fINAME\fR
-Create a scrollback bookmark at the current line.
+Profiles are created via the REST API or
+.B rdw
+highlight commands.
 .TP
 .B sc:\fIACTION\fR
-Scrollback control: \fBclear\fR, \fBtop\fR, \fBbottom\fR.
+Scrollback control.
+\fBclear\fR wipes the server-side buffer and all browser views.
+\fBtop\fR and \fBbottom\fR scroll the browser view without clearing.
+.TP
+.B t:
+Toggle a line-level RFC-3339 timestamp prefix on subsequent output.
+.TP
+.B c:
+Clear the pane scrollback (alias for sc:clear via legacy prefix).
 .SH AUTHENTICATION
-The server requires a Bearer token on all authenticated endpoints.
-Tokens are stored SHA-256 hashed; the plain-text value is shown once at
-creation and never again.
+All REST API endpoints and WebSocket connections require a Bearer token unless
+.B \-\-no\-auth
+is set.
+Tokens are stored SHA-256 hashed on the server.
+The plain-text token is shown exactly once at creation.
 .PP
 The Unix domain socket at
 .I $XDG_RUNTIME_DIR/rdw/<session_id>.sock
-accepts connections from the local user without a token.
+(mode 0600) accepts connections from the owning user without a token.
+.B rdw pipe
+prefers this path; it falls back to HTTP Bearer token for remote servers.
+.PP
+The admin endpoint
+.I /api/v1/admin/connections
+additionally requires a loopback source address regardless of token scope.
+Use
+.B \-\-network\-expose
+to lift this restriction.
+.SH LAYOUT FILE FORMAT
+Layout files are YAML with the following structure:
+.PP
+.nf
+schema_version: 1
+windows:
+  - name: STRING
+    panes:
+      - target_id: STRING
+        split: h|v
+        size: STRING        # N, Npx, or N%
+        group: STRING       # optional group name
+        private: BOOL
+        scrollback_cap: N
+.fi
 .SH ENVIRONMENT
 .TP
 .B XDG_RUNTIME_DIR
-Base directory for the Unix socket. Defaults to \fI/run/user/<uid>\fR.
+Base directory for the Unix socket.
+Defaults to \fI/run/user/<uid>\fR.
 .TP
 .B XDG_CACHE_HOME
-Base directory for the server registry. Defaults to \fI$HOME/.cache\fR.
+Base directory for the server registry file.
+Defaults to \fI$HOME/.cache\fR.
 .SH FILES
 .TP
 .I $XDG_CACHE_HOME/rdw/servers.json
-Registry of running rdw instances.
+Registry of running rdw instances used by multi-server discovery.
 .TP
 .I $XDG_RUNTIME_DIR/rdw/<id>.sock
 Unix socket for the session identified by \fIid\fR.
+.TP
+.I ~/.config/rdw/config.yaml
+Optional configuration file.
 .SH SEE ALSO
 .BR rd (1)
+.PP
+Full documentation: https://github.com/nkh/rdw/tree/main/docs
 .SH AUTHORS
-rdw was written by nkh. Source: https://github.com/nkh/rdw
+rdw was written by nkh.
