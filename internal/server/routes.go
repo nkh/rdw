@@ -12,6 +12,7 @@ import (
 	"github.com/nkh/rdw/internal/bindings"
 	"github.com/nkh/rdw/internal/cycle"
 	"github.com/nkh/rdw/internal/format"
+	"github.com/nkh/rdw/internal/pipeline"
 	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/terminal"
 	"github.com/nkh/rdw/internal/kvstore"
@@ -100,6 +101,7 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("PATCH /api/v1/panes/{id}",        s.handlePaneRename)
 	unauth("GET /api/v1/formatters",           http.HandlerFunc(s.handleFormatters))
 	authed("POST /api/v1/panes/{id}/format",  s.handlePaneFormat)
+	authed("POST /api/v1/panes/{id}/filters", s.handlePaneFilterAdd)
 	authed("GET /api/v1/panes/{id}/bookmarks",        s.handleBookmarkList)
 	authed("PUT /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkAdd)
 	authed("DELETE /api/v1/panes/{id}/bookmarks/{name}", s.handleBookmarkDelete)
@@ -110,6 +112,7 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("DELETE /api/v1/panes/{id}/terminal",  s.handleTerminalKill)
 	authed("POST /api/v1/cycle/start",            s.handleCycleStart)
 	authed("POST /api/v1/cycle/stop",             s.handleCycleStop)
+	authed("GET /api/v1/cycle/status",           s.handleCycleStatus)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -473,9 +476,31 @@ func (s *Server) handleLayoutApply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.manager.RestoreSnapshot(snap); err != nil {
+	// Collect pane IDs before restore so we can deregister removed panes.
+	before := s.manager.AllPaneIDs()
+
+	if err := s.manager.RestoreSnapshot(snap) ; err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	after := make(map[session.TargetID]struct{})
+	for _, id := range s.manager.AllPaneIDs() {
+		after[id] = struct{}{}
+	}
+
+	// Deregister pipelines for panes no longer in the session.
+	for _, id := range before {
+		if _, kept := after[id] ; !kept {
+			s.router.Deregister(id)
+		}
+	}
+
+	// Register pipelines for panes that are new to the session.
+	for id := range after {
+		if _, ok := s.router.Get(id) ; !ok {
+			_, _ = s.router.Register(id, s.cfg.Server.ScrollbackCap)
+		}
 	}
 
 	s.broadcastLayoutUpdate()
@@ -1095,6 +1120,8 @@ func (s *Server) handleCycleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithCancel(s.runCtx)
 	s.cycleCancel = cancel
+	s.cycleState.Windows = body.Windows
+	s.cycleState.Interval = body.Interval
 	s.cycleMu.Unlock()
 
 	ch := c.Run(ctx)
@@ -1126,4 +1153,63 @@ func (s *Server) handleCycleStop(w http.ResponseWriter, _ *http.Request) {
 	s.cycleCancel()
 	s.cycleCancel = nil
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handlePaneFilterAdd attaches a shell-command filter to a pane's pipeline.
+func (s *Server) handlePaneFilterAdd(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+
+	var body struct {
+		Cmd string `json:"cmd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body) ; err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	if body.Cmd == "" {
+		apiError(w, http.StatusBadRequest, "cmd is required")
+		return
+	}
+
+	id, err := session.ParseTargetID(idStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid pane ID: "+err.Error())
+		return
+	}
+
+	pl, ok := s.router.Get(id)
+	if !ok {
+		apiError(w, http.StatusNotFound, "pane not found: "+idStr)
+		return
+	}
+
+	cf, err := pipeline.NewCmdFilter(body.Cmd)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if err := pl.AddFilter(cf.Filter) ; err != nil {
+		_ = cf.Close()
+		apiError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleCycleStatus returns whether a cycle is running and its configuration.
+func (s *Server) handleCycleStatus(w http.ResponseWriter, _ *http.Request) {
+	s.cycleMu.Lock()
+	running := s.cycleCancel != nil
+	wins := s.cycleState.Windows
+	interval := s.cycleState.Interval
+	s.cycleMu.Unlock()
+
+	jsonResponse(w, map[string]any{
+		"running":     running,
+		"windows":     wins,
+		"interval_ms": interval,
+	})
 }

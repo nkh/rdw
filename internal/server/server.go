@@ -47,6 +47,10 @@ type Server struct {
 	terminals  *terminal.Manager
 	cycleCancel context.CancelFunc // non-nil while a focus cycle is running; guarded by cycleMu
 	cycleMu     sync.Mutex
+	cycleState  struct {
+		Windows  []string
+		Interval int
+	}
 	runCtx      context.Context // cancelled when server shuts down
 	manager    *session.Manager
 	router     *router.Router

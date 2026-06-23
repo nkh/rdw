@@ -319,3 +319,18 @@ func (m *Manager) RestoreSnapshot(data []byte) error {
 
 	return nil
 }
+
+// AllPaneIDs returns the TargetID of every pane across all windows.
+func (m *Manager) AllPaneIDs() []TargetID {
+m.mu.RLock()
+defer m.mu.RUnlock()
+
+var ids []TargetID
+for _, w := range m.windows {
+	for _, p := range w.Panes {
+		ids = append(ids, p.TargetID)
+		}
+	}
+
+return ids
+}

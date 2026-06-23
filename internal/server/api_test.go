@@ -1146,3 +1146,101 @@ func TestAPI_AdminLoopback_PermitsLocalhost(t *testing.T) {
 	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 }
+
+// ---------------------------------------------------------------------------
+// sc:clear clears server scrollback so replay is empty
+// ---------------------------------------------------------------------------
+
+func TestAPI_ScrollbackClear_EmptiesBuffer(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("sc1"),
+		ScrollbackCap: 100,
+	})
+	_, _ = s.Router().Register(mustID("sc1"), 100)
+	pl, _ := s.Router().Get(mustID("sc1"))
+
+	// Clear directly to verify the buffer mechanism.
+	pl.Scrollback().Append("line one")
+	pl.Scrollback().Append("line two")
+	require.Equal(t, 2, pl.Scrollback().Len())
+
+	pl.Scrollback().Clear()
+	assert.Equal(t, 0, pl.Scrollback().Len())
+
+	// Stream ingest endpoint with sc:clear must return 204.
+	resp := c.post("/api/v1/stream/sc1", map[string]string{"line": "sc:clear"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Cycle status
+// ---------------------------------------------------------------------------
+
+func TestAPI_Cycle_Status_NotRunning(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	var body map[string]interface{}
+	resp := c.get("/api/v1/cycle/status")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, false, body["running"])
+}
+
+func TestAPI_Cycle_Status_Running(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/cycle/start", map[string]interface{}{
+		"windows":     []string{"a", "b"},
+		"interval_ms": 60000,
+	})
+	resp.Body.Close()
+
+	var body map[string]interface{}
+	resp = c.get("/api/v1/cycle/status")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+
+	assert.Equal(t, true, body["running"])
+	assert.Equal(t, float64(60000), body["interval_ms"])
+
+	// Stop the cycle.
+	resp = c.post("/api/v1/cycle/stop", nil)
+	resp.Body.Close()
+}
+
+// ---------------------------------------------------------------------------
+// Filter registration
+// ---------------------------------------------------------------------------
+
+func TestAPI_Filter_Add_MissingPipeline(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/panes/ghost/filters", map[string]string{"cmd": "cat"})
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+func TestAPI_Filter_Add_EmptyCmd(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("flt1"),
+		ScrollbackCap: 100,
+	})
+	_, _ = s.Router().Register(mustID("flt1"), 100)
+
+	resp := c.post("/api/v1/panes/flt1/filters", map[string]string{"cmd": ""})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}

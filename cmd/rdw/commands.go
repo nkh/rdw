@@ -140,6 +140,8 @@ func init() {
 		"mirror stream to a local file or FIFO path")
 	pipeCmd.Flags().String("forward-to-cmd", "",
 		"mirror stream as stdin to this shell command")
+	pipeCmd.Flags().StringArray("filter", nil,
+		"attach a shell command as a filter stage (repeatable)")
 	_ = pipeCmd.MarkFlagRequired("id")
 }
 
@@ -168,6 +170,21 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 	}
 
 	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
+
+	// Register --filter stages with the server before streaming begins.
+	if filters, _ := cmd.Flags().GetStringArray("filter") ; len(filters) > 0 {
+		rc := &restClient{base: fmt.Sprintf("http://127.0.0.1:%d", resolved)}
+		for _, f := range filters {
+			resp, err := rc.post("/api/v1/panes/"+idStr+"/filters",
+				map[string]string{"cmd": f})
+			if err != nil {
+				return fmt.Errorf("registering filter %q: %w", f, err)
+			}
+			if err := checkStatus(resp, http.StatusNoContent) ; err != nil {
+				return err
+			}
+		}
+	}
 
 	src := io.Reader(os.Stdin)
 
@@ -225,6 +242,10 @@ func applyLayoutRef(rc *restClient, ref string) error {
 		if err != nil {
 			return fmt.Errorf("not a saved preset and cannot load as file: %w", err)
 		}
+	}
+
+	if l.SchemaVersion != 1 {
+		return fmt.Errorf("layout %q: unsupported schema_version %d (expected 1)", ref, l.SchemaVersion)
 	}
 
 	// Upload to server as a new preset.
@@ -1021,8 +1042,37 @@ var cycleStopCmd = &cobra.Command{
 	},
 }
 
+var cycleStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show whether a focus cycle is running",
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		port, _ := cmd.Root().PersistentFlags().GetInt("port")
+		rc, err := newRestClient(port)
+		if err != nil {
+			return err
+		}
+		resp, err := rc.get("/api/v1/cycle/status")
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body) ; err != nil {
+			return err
+		}
+		if running, _ := body["running"].(bool) ; running {
+			wins := ifaceSliceStr(body["windows"])
+			ms, _ := body["interval_ms"].(float64)
+			fmt.Printf("running  windows=%v  interval=%dms\n", wins, int(ms))
+		} else {
+			fmt.Println("not running")
+		}
+		return nil
+	},
+}
+
 func init() {
 	cycleStartCmd.Flags().Int("interval-ms", 5000, "dwell time per window in milliseconds")
-	cycleCmd.AddCommand(cycleStartCmd, cycleStopCmd)
+	cycleCmd.AddCommand(cycleStartCmd, cycleStopCmd, cycleStatusCmd)
 	rootCmd.AddCommand(cycleCmd)
 }

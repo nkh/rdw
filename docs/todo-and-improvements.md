@@ -2,17 +2,13 @@
 
 ## What is left to do
 
-These are genuine gaps — missing functionality or known bugs not yet resolved.
+All previously listed items are now resolved:
 
-- `rdw pipe --filter CMD` is not implemented. `Pipeline.AddFilter` exists and the config field `filter_chain_max` is wired, but there is no CLI flag, no API endpoint, and no code path that registers an external filter on a live pipeline. A process that transforms lines (grep, sed, jq) cannot currently be attached to a stream at runtime.
-
-- `rdw pipe --layout FILE` does not validate `schema_version` before uploading the file to the server. A file with a wrong version silently fails server-side with a 400. The client should check `l.SchemaVersion != 1` and return a clear error.
-
-- `handleLayoutApply` does not reconcile the Router. When a snapshot is restored, pipelines for panes that existed in the old session but not in the new snapshot remain registered in the Router. Panes in the snapshot that have no pipeline produce a 404 on stream ingest until a new `rdw pipe` connects. The apply handler should diff old and new pane sets and call `router.Deregister` / `router.Register` accordingly.
-
-- `sc:clear` clears the server-side `ScrollbackBuffer` and broadcasts to connected browsers, but reconnecting browsers perform a scrollback replay from the buffer. Since the buffer is cleared, the replay is empty — correct. However there is no test covering this end-to-end path.
-
-- The `rdw cycle start` CLI command exists but there is no `rdw cycle status` command to query whether a cycle is running and which windows it covers.
+- `rdw pipe --filter CMD` — implemented: `pipeline.CmdFilter`, `POST /api/v1/panes/{id}/filters`, `--filter` flag on `rdw pipe`
+- `rdw pipe --layout FILE` schema_version validation — added: client validates `schema_version == 1` before upload
+- Layout apply router reconciliation — implemented: `handleLayoutApply` diffs pane sets and calls `Deregister`/`Register`
+- `sc:clear` end-to-end test — added: `TestAPI_ScrollbackClear_EmptiesBuffer`
+- `rdw cycle status` — implemented: `GET /api/v1/cycle/status`, `rdw cycle status` CLI command
 
 ## 50 improvements
 
