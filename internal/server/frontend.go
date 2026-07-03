@@ -661,6 +661,76 @@ function applyHighlightProfile(targetID, rules) {
   });
 }
 
+function renderImage(targetID, b64data, scale) {
+  var body = ws_el.querySelector('.pbody[data-id="'+CSS.escape(targetID)+'"]');
+  if (!body) return;
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'rdw-image-block rdw-scale-' + scale;
+
+  var img = document.createElement('img');
+  img.src = 'data:image/png;base64,' + b64data;
+  img.className = 'rdw-img';
+  img.alt = '';
+  img.onerror = function() {
+    // Try JPEG if PNG fails; server already b64-encoded the raw bytes.
+    img.onerror = null;
+  };
+
+  wrapper.appendChild(img);
+  body.appendChild(wrapper);
+
+  var atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+  if (atBottom) body.scrollTop = body.scrollHeight;
+}
+
+function renderSVG(targetID, b64data, scale) {
+  var body = ws_el.querySelector('.pbody[data-id="'+CSS.escape(targetID)+'"]');
+  if (!body) return;
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'rdw-svg-block rdw-scale-' + scale;
+
+  try {
+    var svgText = atob(b64data);
+    wrapper.innerHTML = svgText;
+    // Ensure the embedded SVG is responsive.
+    var svgEl = wrapper.querySelector('svg');
+    if (svgEl) {
+      svgEl.style.width  = scale === 'native' ? '' : '100%';
+      svgEl.style.height = scale === 'fill'   ? '100%' : 'auto';
+      svgEl.removeAttribute('width');
+      svgEl.removeAttribute('height');
+    }
+  } catch(e) {
+    wrapper.textContent = '[svg decode error]';
+  }
+
+  body.appendChild(wrapper);
+
+  var atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+  if (atBottom) body.scrollTop = body.scrollHeight;
+}
+
+function setPaneScale(targetID, scale) {
+  var body = ws_el.querySelector('.pbody[data-id="'+CSS.escape(targetID)+'"]');
+  if (!body) return;
+  // Update all existing image/svg blocks in this pane.
+  body.querySelectorAll('.rdw-image-block, .rdw-svg-block').forEach(function(el) {
+    el.className = el.className.replace(/rdw-scale-\w+/, 'rdw-scale-' + scale);
+    var img = el.querySelector('img');
+    if (img) {
+      img.style.width  = scale === 'native' ? '' : '100%';
+      img.style.height = scale === 'fill'   ? '100%' : 'auto';
+    }
+    var svgEl = el.querySelector('svg');
+    if (svgEl) {
+      svgEl.style.width  = scale === 'native' ? '' : '100%';
+      svgEl.style.height = scale === 'fill'   ? '100%' : 'auto';
+    }
+  });
+}
+
 function appendLine(targetID, text) {
   // Maintain scrollback in state.
   if (!state.scrollbacks[targetID]) state.scrollbacks[targetID] = [];
@@ -1179,6 +1249,31 @@ function connect() {
           } else if (msg.action === 'bottom') {
             el.scrollTop = el.scrollHeight;
           }
+        }
+        break;
+
+      case 'image_render':
+        if (msg.target_id && msg.data) {
+          renderImage(msg.target_id, msg.data, msg.scale || 'fit');
+        }
+        break;
+
+      case 'svg_render':
+        if (msg.target_id && msg.data) {
+          renderSVG(msg.target_id, msg.data, msg.scale || 'fit');
+        }
+        break;
+
+      case 'pane_scale':
+        if (msg.target_id && msg.scale) {
+          setPaneScale(msg.target_id, msg.scale);
+        }
+        break;
+
+      case 'formatter_set':
+        if (msg.target_id !== undefined) {
+          state.paneFormatter = state.paneFormatter || {};
+          state.paneFormatter[msg.target_id] = msg.formatter || 'text';
         }
         break;
 

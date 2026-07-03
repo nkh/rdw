@@ -4,7 +4,6 @@
 package pipe
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -63,40 +62,35 @@ func Relay(ctx context.Context, r io.Reader, opts Options) error {
 
 // relay is the core loop: read lines, buffer on error, flush and continue.
 func relay(ctx context.Context, r io.Reader, send func(string) error, queueLen int) error {
-	scanner := bufio.NewScanner(r)
+	hr := newHybridReader(r)
 	queue := make([]string, 0, 64)
 
-	for scanner.Scan() {
+	for hr.Next() {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		line := scanner.Text()
+		line := hr.Text()
 
-		// Flush buffered lines first.
 		var i int
 		for i < len(queue) {
 			if err := send(queue[i]); err != nil {
-				// Still disconnected — keep buffering.
 				break
 			}
 			i++
 		}
 		queue = queue[i:]
 
-		// Send the current line.
 		if err := send(line); err != nil {
-			// Buffer it if there is room.
 			if len(queue) < queueLen {
 				queue = append(queue, line)
 			}
-			// Drop oldest if overflow — silent, matches spec.
 		}
 	}
 
-	return scanner.Err()
+	return hr.Err()
 }
 
 // sendViaUnix sends a single line through the server's Unix domain socket.

@@ -15,13 +15,15 @@ const maxPanesPerWindow = 64
 
 // PaneState describes a live pane.
 type PaneState struct {
-	TargetID      TargetID  `json:"target_id"`
-	Label         string    `json:"label,omitempty"`
-	Group         string    `json:"group,omitempty"`
-	Private       bool      `json:"private,omitempty"`
-	ScrollbackCap int       `json:"scrollback_cap"`
-	Split         string    `json:"split,omitempty"`
-	Size          string    `json:"size,omitempty"`
+	TargetID      TargetID `json:"target_id"`
+	Label         string   `json:"label,omitempty"`
+	Group         string   `json:"group,omitempty"`
+	Private       bool     `json:"private,omitempty"`
+	ScrollbackCap int      `json:"scrollback_cap"`
+	Split         string   `json:"split,omitempty"`
+	Size          string   `json:"size,omitempty"`
+	Formatter     string   `json:"formatter,omitempty"`      // active formatter name
+	SavedFormatter string  `json:"saved_formatter,omitempty"` // saved before image:/svg:
 }
 
 // WindowState describes a live window.

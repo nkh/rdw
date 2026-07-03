@@ -26,10 +26,20 @@ const (
 	KindFormatter  Kind = "f"
 	KindRelay      Kind = "r"
 	KindKV         Kind = "="
-	KindBase64     Kind = "b64" // b64: prefix — payload is base64-encoded data
-	KindBookmark   Kind = "bm"  // bm: prefix — create a scrollback bookmark
-	KindHighlight  Kind = "hl"  // hl: prefix — apply a highlight profile
-	KindScrollback Kind = "sc"  // sc: prefix — scrollback control (clear/top/bottom)
+	KindBase64     Kind = "b64"   // b64:   payload is base64-encoded data
+	KindBookmark   Kind = "bm"    // bm:    create a scrollback bookmark
+	KindHighlight  Kind = "hl"    // hl:    apply a highlight profile
+	KindScrollback Kind = "sc"    // sc:    scrollback control (clear/top/bottom)
+	KindImage      Kind = "image"    // image:    sentinel-framed binary; server base64-encodes
+	KindSVG        Kind = "svg"      // svg:      sentinel-framed UTF-8 SVG
+	KindScale      Kind = "scale"    // scale:    fit|fill|native per-pane image scaling
+	KindSVGData    Kind = "svg-data" // svg-data: base64-encoded SVG from hybrid reader
+)
+
+// Sentinels that close an image: or svg: frame.
+const (
+	SentinelImageEnd = "image:end"
+	SentinelSVGEnd   = "svg:end"
 )
 
 var knownKinds = map[string]Kind{
@@ -51,10 +61,14 @@ type Sequence struct {
 
 // multiKinds maps multi-character prefixes (without trailing colon) to Kind.
 var multiKinds = map[string]Kind{
-	"b64": KindBase64,
-	"bm":  KindBookmark,
-	"hl":  KindHighlight,
-	"sc":  KindScrollback,
+	"b64":      KindBase64,
+	"bm":       KindBookmark,
+	"hl":       KindHighlight,
+	"sc":       KindScrollback,
+	"image":    KindImage,
+	"svg":      KindSVG,
+	"scale":    KindScale,
+	"svg-data": KindSVGData,
 }
 
 // Parse attempts to parse line as a control sequence.

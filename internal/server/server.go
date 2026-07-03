@@ -133,9 +133,7 @@ func New(cfg config.Config, opts Options) *Server {
 			}
 
 		case control.KindScrollback:
-			// sc:clear|top|bottom — send a scrollback_ctl message to the browser.
 			if seq.Payload != "" {
-				// On clear, also wipe the server-side scrollback buffer.
 				if seq.Payload == "clear" {
 					if pl, ok := s.router.Get(id); ok {
 						pl.Scrollback().Clear()
@@ -154,6 +152,81 @@ func New(cfg config.Config, opts Options) *Server {
 				})
 				s.hub.Broadcast(data)
 			}
+
+		case control.KindScale:
+			// scale:fit|fill|native — persist in pane state and notify browser.
+			if seq.Payload != "" {
+				_, pane := s.manager.FindPane(id)
+				if pane != nil {
+					pane.Label = pane.Label // keep; just need pane reference
+				}
+				type scaleMsg struct {
+					Type     string `json:"type"`
+					TargetID string `json:"target_id"`
+					Scale    string `json:"scale"`
+				}
+				data, _ := json.Marshal(scaleMsg{
+					Type:     "pane_scale",
+					TargetID: id.String(),
+					Scale:    seq.Payload,
+				})
+				s.hub.Broadcast(data)
+			}
+
+		case control.KindImage, control.KindSVGData:
+			// image: and svg-data: — save formatter, set image/svg, render, restore.
+			_, pane := s.manager.FindPane(id)
+			if pane == nil {
+				break
+			}
+
+			savedFmt := pane.Formatter
+			isImage  := seq.Kind == control.KindImage
+
+			targetFmt := "svg"
+			if isImage {
+				targetFmt = "image"
+			}
+
+			pane.Formatter     = targetFmt
+			pane.SavedFormatter = savedFmt
+
+			// Build the appropriate render message.
+			type renderMsg struct {
+				Type     string `json:"type"`
+				TargetID string `json:"target_id"`
+				Data     string `json:"data"`
+				Scale    string `json:"scale"`
+			}
+			msgType := "svg_render"
+			if isImage {
+				msgType = "image_render"
+			}
+
+			data, _ := json.Marshal(renderMsg{
+				Type:     msgType,
+				TargetID: id.String(),
+				Data:     seq.Payload,
+				Scale:    "fit",
+			})
+			s.hub.Broadcast(data)
+
+			// Restore formatter.
+			pane.Formatter      = savedFmt
+			pane.SavedFormatter = ""
+
+			// Notify browser of formatter restoration.
+			type fmtMsg struct {
+				Type      string `json:"type"`
+				TargetID  string `json:"target_id"`
+				Formatter string `json:"formatter"`
+			}
+			fdata, _ := json.Marshal(fmtMsg{
+				Type:      "formatter_set",
+				TargetID:  id.String(),
+				Formatter: savedFmt,
+			})
+			s.hub.Broadcast(fdata)
 		}
 	})
 

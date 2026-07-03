@@ -3,11 +3,13 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -1075,4 +1077,116 @@ func init() {
 	cycleStartCmd.Flags().Int("interval-ms", 5000, "dwell time per window in milliseconds")
 	cycleCmd.AddCommand(cycleStartCmd, cycleStopCmd, cycleStatusCmd)
 	rootCmd.AddCommand(cycleCmd)
+}
+
+// ---------------------------------------------------------------------------
+// rdw send
+// ---------------------------------------------------------------------------
+
+var sendCmd = &cobra.Command{
+	Use:   "send --id TARGET_ID FILE",
+	Short: "Send a file to a pane (image, SVG, CSV, text)",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runSend,
+}
+
+func init() {
+	sendCmd.Flags().String("id", "", "target pane identifier (required)")
+	_ = sendCmd.MarkFlagRequired("id")
+	rootCmd.AddCommand(sendCmd)
+}
+
+func runSend(cmd *cobra.Command, args []string) error {
+	idStr, _ := cmd.Flags().GetString("id")
+	path := args[0]
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("send: read %q: %w", path, err)
+	}
+
+	port := portFlag(cmd)
+	resolved, err := discovery.Resolve(port)
+	if err != nil {
+		return err
+	}
+
+	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
+	line := buildSendLine(path, data)
+
+	opts := pipepkg.Options{
+		TargetID:          mustParseID(idStr),
+		Port:              resolved,
+		SocketPath:        socketPath,
+		ReconnectQueueLen: 10,
+	}
+
+	return pipepkg.Relay(context.Background(), strings.NewReader(line+"\n"), opts)
+}
+
+// buildSendLine detects the file type and returns the appropriate control line.
+func buildSendLine(path string, data []byte) string {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	// SVG: by extension or by magic.
+	if ext == ".svg" || (len(data) > 4 && strings.HasPrefix(strings.TrimSpace(string(data[:min(100, len(data))])), "<svg")) {
+		return "svg-data:" + base64.StdEncoding.EncodeToString(data)
+	}
+
+	// CSV/TSV by extension.
+	if ext == ".csv" || ext == ".tsv" {
+		return "f:csv\n" + string(data)
+	}
+
+	// Markdown by extension.
+	if ext == ".md" || ext == ".markdown" {
+		return "f:markdown\n" + string(data)
+	}
+
+	// Image: PNG, JPEG, GIF, WebP by magic bytes.
+	if isImageMagic(data) || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".webp" {
+		return "b64:" + base64.StdEncoding.EncodeToString(data)
+	}
+
+	// Default: plain text.
+	return string(data)
+}
+
+func isImageMagic(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	// PNG
+	if data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G' {
+		return true
+	}
+	// JPEG
+	if data[0] == 0xFF && data[1] == 0xD8 {
+		return true
+	}
+	// GIF
+	if len(data) >= 6 && (string(data[:6]) == "GIF87a" || string(data[:6]) == "GIF89a") {
+		return true
+	}
+	// WebP
+	if len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP" {
+		return true
+	}
+	return false
+}
+
+func mustParseID(s string) session.TargetID {
+	id, err := session.ParseTargetID(s)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid target ID %q: %v\n", s, err)
+		os.Exit(1)
+	}
+	return id
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

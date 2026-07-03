@@ -156,3 +156,37 @@ func TestParse_MultiCharPrefixNoConflict(t *testing.T) {
 	_, ok := control.Parse("b:data")
 	assert.False(t, ok)
 }
+
+func TestParse_Image(t *testing.T) {
+	seq, ok := control.Parse("image:")
+	require.True(t, ok)
+	assert.Equal(t, control.KindImage, seq.Kind)
+	assert.Equal(t, "", seq.Payload)
+}
+
+func TestParse_SVG(t *testing.T) {
+	seq, ok := control.Parse("svg:")
+	require.True(t, ok)
+	assert.Equal(t, control.KindSVG, seq.Kind)
+}
+
+func TestParse_SVGData(t *testing.T) {
+	seq, ok := control.Parse("svg-data:aGVsbG8=")
+	require.True(t, ok)
+	assert.Equal(t, control.KindSVGData, seq.Kind)
+	assert.Equal(t, "aGVsbG8=", seq.Payload)
+}
+
+func TestParse_Scale(t *testing.T) {
+	for _, v := range []string{"fit", "fill", "native"} {
+		seq, ok := control.Parse("scale:" + v)
+		require.True(t, ok, v)
+		assert.Equal(t, control.KindScale, seq.Kind)
+		assert.Equal(t, v, seq.Payload)
+	}
+}
+
+func TestSentinels(t *testing.T) {
+	assert.Equal(t, "image:end", control.SentinelImageEnd)
+	assert.Equal(t, "svg:end",   control.SentinelSVGEnd)
+}

@@ -220,6 +220,9 @@ rdw completion bash
 | `bm:` | create scrollback bookmark at current line |
 | `hl:` | apply named highlight profile to pane |
 | `sc:` | scrollback control: `clear`, `top`, `bottom` |
+| `image:` ... `image:end` | sentinel-framed binary block; rdw base64-encodes internally |
+| `svg:` ... `svg:end` | sentinel-framed UTF-8 SVG; rendered inline in browser |
+| `scale:` | image/SVG scaling: `fit` (default), `fill`, `native` |
 
 ```sh
 echo "=:build.status=passing;duration=12s" | rdw pipe --id log
@@ -227,7 +230,32 @@ echo "v:=:literal content not a KV write" | rdw pipe --id log
 echo "bm:section_start" | rdw pipe --id log
 echo "hl:errors" | rdw pipe --id log
 echo "sc:clear" | rdw pipe --id log
+
+# Send an image inline (rdw handles the base64 encoding)
+{ echo "image:" ; cat chart.png ; echo "image:end" ; } | rdw pipe --id chart
+
+# Send an SVG
+{ echo "svg:" ; cat diagram.svg ; echo "svg:end" ; } | rdw pipe --id diagram
+
+# Set scaling
+echo "scale:fill" | rdw pipe --id chart
 ```
+
+---
+
+## rdw send
+
+Send any file directly to a pane — no manual base64 or control sequences needed:
+
+```sh
+rdw send --id chart  chart.png       # PNG/JPEG/GIF/WebP → image_render
+rdw send --id diag   diagram.svg     # SVG → svg_render
+rdw send --id data   report.csv      # CSV → formatter set to csv
+rdw send --id docs   README.md       # Markdown → formatter set to markdown
+rdw send --id log    output.txt      # Plain text → appended as lines
+```
+
+Type is detected from magic bytes first, then extension.
 
 ---
 
