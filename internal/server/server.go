@@ -103,6 +103,16 @@ func New(cfg config.Config, opts Options) *Server {
 	// Wire control sequence handler for bm:, hl:, sc: sequences.
 	s.router.SetControlHandler(func(id session.TargetID, seq control.Sequence) {
 		switch seq.Kind {
+		case control.KindTitle:
+			// title:NAME — set the pane display title, broadcast layout update.
+			if seq.Payload != "" {
+				_, pane := s.manager.FindPane(id)
+				if pane != nil {
+					pane.Label = seq.Payload
+					s.broadcastLayoutUpdate()
+				}
+			}
+
 		case control.KindBookmark:
 			if bs := s.router.Bookmarks(id); bs != nil && seq.Payload != "" {
 				// Line index is the current scrollback length.
@@ -154,12 +164,7 @@ func New(cfg config.Config, opts Options) *Server {
 			}
 
 		case control.KindScale:
-			// scale:fit|fill|native — persist in pane state and notify browser.
 			if seq.Payload != "" {
-				_, pane := s.manager.FindPane(id)
-				if pane != nil {
-					pane.Label = pane.Label // keep; just need pane reference
-				}
 				type scaleMsg struct {
 					Type     string `json:"type"`
 					TargetID string `json:"target_id"`

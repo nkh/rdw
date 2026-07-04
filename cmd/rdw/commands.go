@@ -144,6 +144,8 @@ func init() {
 		"mirror stream as stdin to this shell command")
 	pipeCmd.Flags().StringArray("filter", nil,
 		"attach a shell command as a filter stage (repeatable)")
+	pipeCmd.Flags().String("title", "",
+		"display title for the pane (sets label on connect)")
 	_ = pipeCmd.MarkFlagRequired("id")
 }
 
@@ -172,6 +174,16 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 	}
 
 	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
+
+	// Set pane title if --title given.
+	if title, _ := cmd.Flags().GetString("title") ; title != "" {
+		rc := &restClient{base: fmt.Sprintf("http://127.0.0.1:%d", resolved)}
+		resp, err := rc.patch("/api/v1/panes/"+idStr, map[string]string{"title": title})
+		if err != nil {
+			return fmt.Errorf("setting title: %w", err)
+		}
+		resp.Body.Close()
+	}
 
 	// Register --filter stages with the server before streaming begins.
 	if filters, _ := cmd.Flags().GetStringArray("filter") ; len(filters) > 0 {
@@ -492,6 +504,23 @@ var paneSwapCmd = &cobra.Command{
 	},
 }
 
+var paneRenameCmd = &cobra.Command{
+	Use:   "rename <pane-id> <title>",
+	Short: "Set the display title of a pane",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rc, err := newRestClient(portFlag(cmd))
+		if err != nil {
+			return err
+		}
+		resp, err := rc.patch("/api/v1/panes/"+args[0], map[string]string{"title": args[1]})
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusNoContent)
+	},
+}
+
 var paneCloseCmd = &cobra.Command{
 	Use:   "close <pane-id>",
 	Short: "Close a pane",
@@ -516,6 +545,7 @@ func init() {
 	paneCmd.AddCommand(paneZoomCmd)
 	paneCmd.AddCommand(paneSwapCmd)
 	paneCmd.AddCommand(paneCloseCmd)
+	paneCmd.AddCommand(paneRenameCmd)
 	paneSplitCmd.Flags().StringP("group", "g", "", "assign pane to a group")
 	paneSplitCmd.Flags().Bool("private", false, "hide pane from non-owner tokens")
 }

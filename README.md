@@ -223,6 +223,7 @@ rdw completion bash
 | `image:` ... `image:end` | sentinel-framed binary block; rdw base64-encodes internally |
 | `svg:` ... `svg:end` | sentinel-framed UTF-8 SVG; rendered inline in browser |
 | `scale:` | image/SVG scaling: `fit` (default), `fill`, `native` |
+| `title:NAME` | set the pane's display title |
 
 ```sh
 echo "=:build.status=passing;duration=12s" | rdw pipe --id log

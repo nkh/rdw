@@ -875,18 +875,24 @@ func (s *Server) handleExportAll(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handlePaneRename sets a display label on a pane without changing its TargetID.
+// handlePaneRename sets a pane's display title. Accepts {"title":"..."} or {"label":"..."}.
 func (s *Server) handlePaneRename(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	var body struct {
-		Label string `json:"label"`
+		Title string `json:"title"`
+		Label string `json:"label"` // backward compat
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&body) ; err != nil {
 		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	if body.Label == "" {
-		apiError(w, http.StatusBadRequest, "label is required")
+
+	title := body.Title
+	if title == "" {
+		title = body.Label
+	}
+	if title == "" {
+		apiError(w, http.StatusBadRequest, "title is required")
 		return
 	}
 
@@ -902,7 +908,7 @@ func (s *Server) handlePaneRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pane.Label = body.Label
+	pane.Label = title
 	s.broadcastLayoutUpdate()
 	w.WriteHeader(http.StatusNoContent)
 }

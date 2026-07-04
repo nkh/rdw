@@ -76,6 +76,10 @@ Mirror the stream to a file or FIFO simultaneously.
 .TP
 .B \-\-forward\-to\-cmd \fICMD\fR
 Mirror the stream as standard input to a shell command simultaneously.
+.TP
+.B \-\-title \fITITLE\fR
+Set the pane display title on connect.
+Equivalent to sending \fBtitle:\fITITLE\fR as the first line.
 .RE
 .SS Window management
 .TP
@@ -107,6 +111,11 @@ Toggle full-window zoom on a pane.
 .TP
 .B rdw pane swap \fIID1\fR \fIID2\fR
 Swap the grid positions of two panes.
+.TP
+.B rdw pane rename \fIID\fR \fITITLE\fR
+Set the display title of a pane.
+The title appears in the pane header.
+Does not change the Target ID used for stream routing.
 .TP
 .B rdw pane close \fIID\fR
 Remove a pane.
@@ -214,6 +223,17 @@ highlight commands.
 Scrollback control.
 \fBclear\fR wipes the server-side buffer and all browser views.
 \fBtop\fR and \fBbottom\fR scroll the browser view without clearing.
+.TP
+.B title:\fINAME\fR
+Set the pane display title.
+The title is shown in the pane header in the browser.
+It can also be set with
+.B rdw pane rename
+or the
+.B \-\-title
+flag on
+.BR "rdw pipe" .
+Does not change the Target ID.
 .TP
 .B t:
 Toggle a line-level RFC-3339 timestamp prefix on subsequent output.

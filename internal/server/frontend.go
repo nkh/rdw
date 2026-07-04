@@ -66,9 +66,11 @@ body{background:var(--bg);color:var(--fg);font:var(--sz)/var(--lh) var(--font);
 .phdr{background:var(--bg2);padding:2px 8px;font-size:11px;color:var(--fg2);
   border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:6px;
   cursor:default}
-.phdr .pid{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phdr .pid{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
+.phdr .pid:hover{text-decoration:underline dotted;cursor:text}
 .phdr .pbtn{cursor:pointer;opacity:.5;font-size:10px;padding:0 3px}
 .phdr .pbtn:hover{opacity:1}
+.phdr .pid-edit{flex:1;background:var(--bg3);color:var(--fg1);border:1px solid var(--accent);border-radius:2px;font-size:11px;padding:0 3px;outline:none}
 .pbody{flex:1;overflow-y:auto;padding:3px 6px;font-size:var(--sz);line-height:var(--lh);
   scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;user-select:text}
 .pbody::-webkit-scrollbar{width:5px}
@@ -493,13 +495,50 @@ function buildPane(paneData) {
 
   var hdr = document.createElement('div');
   hdr.className = 'phdr';
-  hdr.innerHTML = '<span class="pid">' + escHtml(id) + '</span>' +
+  var displayTitle = (paneData.label && paneData.label !== '') ? paneData.label : id;
+  hdr.innerHTML = '<span class="pid" title="' + escHtml(id) + '">' + escHtml(displayTitle) + '</span>' +
     '<span class="pbtn" data-action="pane.zoom" title="Zoom (z)">⬜</span>' +
     '<span class="pbtn" data-action="pane.close" title="Close (q)">✕</span>';
   hdr.querySelectorAll('.pbtn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       dispatch(btn.dataset.action, id);
+    });
+  });
+
+  // Double-click title to edit inline.
+  hdr.querySelector('.pid').addEventListener('dblclick', function(e) {
+    e.stopPropagation();
+    var span = hdr.querySelector('.pid');
+    var current = span.textContent;
+    var input = document.createElement('input');
+    input.className = 'pid-edit';
+    input.value = current;
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+
+    function commit() {
+      var newTitle = input.value.trim();
+      var replacement = document.createElement('span');
+      replacement.className = 'pid';
+      replacement.title = id;
+      replacement.textContent = newTitle || id;
+      input.replaceWith(replacement);
+      replacement.addEventListener('dblclick', arguments.callee);
+      if (newTitle && newTitle !== current) {
+        fetch('/api/v1/panes/' + encodeURIComponent(id), {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (state.token || '')},
+          body: JSON.stringify({title: newTitle}),
+        });
+      }
+    }
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter')  { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') { input.value = current; commit(); }
     });
   });
 
@@ -943,8 +982,11 @@ function doSwap(a, b) {
     elB.style.gridColumn = colA;
     elB.style.gridRow    = rowA;
     elA.dataset.id = b; elB.dataset.id = a;
-    elA.querySelector('.pid').textContent = b;
-    elB.querySelector('.pid').textContent = a;
+    // Preserve whatever title each header was showing.
+    var titleA = elA.querySelector('.pid').textContent;
+    var titleB = elB.querySelector('.pid').textContent;
+    elA.querySelector('.pid').textContent = titleB;
+    elB.querySelector('.pid').textContent = titleA;
   }
   // Tell server (Phase 7 endpoint).
   post('/panes/'+encodeURIComponent(a)+'/swap', {target: b}).catch(console.error);

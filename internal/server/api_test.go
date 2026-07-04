@@ -1244,3 +1244,62 @@ func TestAPI_Filter_Add_EmptyCmd(t *testing.T) {
 	resp.Body.Close()
 	assert.Equal(t, 400, resp.StatusCode)
 }
+
+// ---------------------------------------------------------------------------
+// Pane title
+// ---------------------------------------------------------------------------
+
+func TestAPI_Pane_Title_SetAndRead(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("title1"),
+		ScrollbackCap: 100,
+	})
+
+	// Set via PATCH with title field.
+	resp := c.patch("/api/v1/panes/title1", map[string]string{"title": "My Build Log"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, pane := s.Manager().FindPane(mustID("title1"))
+	require.NotNil(t, pane)
+	assert.Equal(t, "My Build Log", pane.Label)
+}
+
+func TestAPI_Pane_Title_LabelBackcompat(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("title2"),
+		ScrollbackCap: 100,
+	})
+
+	// Old field name "label" still accepted.
+	resp := c.patch("/api/v1/panes/title2", map[string]string{"label": "compat label"})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	_, pane := s.Manager().FindPane(mustID("title2"))
+	require.NotNil(t, pane)
+	assert.Equal(t, "compat label", pane.Label)
+}
+
+func TestAPI_Pane_Title_EmptyRejected(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("title3"),
+		ScrollbackCap: 100,
+	})
+
+	resp := c.patch("/api/v1/panes/title3", map[string]string{"title": ""})
+	resp.Body.Close()
+	assert.Equal(t, 400, resp.StatusCode)
+}

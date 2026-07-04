@@ -52,6 +52,7 @@ rdw pane split ID [--dir h|v]
 rdw pane resize ID SIZE       SIZE: N (cols/rows), Npx, N%
 rdw pane zoom ID
 rdw pane swap ID1 ID2
+rdw pane rename ID TITLE
 rdw pane close ID
 ```
 
@@ -126,6 +127,10 @@ intercepted and acted on rather than displayed.
 | `bm:NAME` | Create a scrollback bookmark at the current line |
 | `hl:PROFILE` | Apply the named highlight profile to the pane |
 | `sc:ACTION` | Scrollback control: clear / top / bottom |
+| `image:` ... `image:end` | Sentinel-framed binary block; rdw base64-encodes internally |
+| `svg:` ... `svg:end` | Sentinel-framed UTF-8 SVG; rendered inline in browser |
+| `scale:MODE` | Image/SVG scaling: fit (default), fill, native |
+| `title:NAME` | Set pane display title |
 | `t:` | Toggle timestamp prefix on subsequent lines |
 | `c:` | Clear pane scrollback |
 | `q:` | Stop the server |
@@ -184,7 +189,7 @@ POST   /api/v1/panes/{id}/zoom                           → 204
 POST   /api/v1/panes/{id}/resize      body:{size}        → 204
 POST   /api/v1/panes/{id}/swap        body:{target}      → 204
 DELETE /api/v1/panes/{id}                                → 204
-PATCH  /api/v1/panes/{id}             body:{label}       → 204  (rename)
+PATCH  /api/v1/panes/{id}             body:{title}       → 204  (set display title; "label" also accepted)
 POST   /api/v1/panes/{id}/format      body:{formatter}   → {html}
 POST   /api/v1/panes/{id}/terminal    body:{cmd}         → {port,url}
 DELETE /api/v1/panes/{id}/terminal                       → 204

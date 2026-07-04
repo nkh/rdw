@@ -34,6 +34,7 @@ const (
 	KindSVG        Kind = "svg"      // svg:      sentinel-framed UTF-8 SVG
 	KindScale      Kind = "scale"    // scale:    fit|fill|native per-pane image scaling
 	KindSVGData    Kind = "svg-data" // svg-data: base64-encoded SVG from hybrid reader
+	KindTitle      Kind = "title"    // title:    set pane display title
 )
 
 // Sentinels that close an image: or svg: frame.
@@ -69,6 +70,7 @@ var multiKinds = map[string]Kind{
 	"svg":      KindSVG,
 	"scale":    KindScale,
 	"svg-data": KindSVGData,
+	"title":    KindTitle,
 }
 
 // Parse attempts to parse line as a control sequence.
