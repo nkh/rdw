@@ -18,6 +18,7 @@ import (
 	"github.com/nkh/rdw/internal/config"
 	"github.com/nkh/rdw/internal/control"
 	"github.com/nkh/rdw/internal/discovery"
+	"github.com/nkh/rdw/internal/format"
 	"github.com/nkh/rdw/internal/highlight"
 	"github.com/nkh/rdw/internal/kvstore"
 	"github.com/nkh/rdw/internal/terminal"
@@ -242,6 +243,14 @@ func New(cfg config.Config, opts Options) *Server {
 func (s *Server) Run(ctx context.Context) error {
 	s.runCtx = ctx
 
+	// Load user-defined formatters from config.
+	for _, uf := range s.cfg.UserFormatters {
+		f := format.NewCmdFormatter(uf.Name, uf.Cmd, nil)
+		if err := format.Register(f) ; err != nil {
+			fmt.Fprintf(os.Stderr, "rdw: formatter %q: %v\n", uf.Name, err)
+		}
+	}
+
 	if s.opts.PersistPath != "" {
 		db, err := kvstore.OpenDB(s.opts.PersistPath)
 		if err != nil {
@@ -270,6 +279,7 @@ func (s *Server) Run(ctx context.Context) error {
 	routes(mux, s, routeConfig{
 		noAuth:         s.cfg.Auth.NoAuth,
 		adminLocalOnly: s.cfg.Auth.AdminLocalOnly,
+		adminToken:     s.cfg.Auth.AdminToken,
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", s.port)
@@ -350,6 +360,7 @@ func (s *Server) HTTPHandler() http.Handler {
 	routes(mux, s, routeConfig{
 		noAuth:         s.cfg.Auth.NoAuth,
 		adminLocalOnly: s.cfg.Auth.AdminLocalOnly,
+		adminToken:     s.cfg.Auth.AdminToken,
 	})
 	return mux
 }

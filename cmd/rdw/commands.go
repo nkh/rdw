@@ -1220,3 +1220,232 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// ---------------------------------------------------------------------------
+// rdw formatter
+// ---------------------------------------------------------------------------
+
+var formatterCmd = &cobra.Command{
+	Use:   "formatter",
+	Short: "Manage user-defined formatters",
+}
+
+var formatterListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List available formatters",
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		rc, err := newRestClient(portFlag(cmd))
+		if err != nil {
+			return err
+		}
+		resp, err := rc.get("/api/v1/formatters")
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		var body map[string][]string
+		if err := json.NewDecoder(resp.Body).Decode(&body) ; err != nil {
+			return err
+		}
+		for _, n := range body["formatters"] {
+			fmt.Println(n)
+		}
+		return nil
+	},
+}
+
+var formatterRegisterCmd = &cobra.Command{
+	Use:   "register <name> <cmd>",
+	Short: "Register a user-defined external formatter",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rc, err := newRestClient(portFlag(cmd))
+		if err != nil {
+			return err
+		}
+		resp, err := rc.post("/api/v1/formatters", map[string]string{
+			"name": args[0],
+			"cmd":  args[1],
+		})
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusNoContent)
+	},
+}
+
+var formatterUnregisterCmd = &cobra.Command{
+	Use:   "unregister <name>",
+	Short: "Unregister a user-defined formatter",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rc, err := newRestClient(portFlag(cmd))
+		if err != nil {
+			return err
+		}
+		resp, err := rc.delete("/api/v1/formatters/" + args[0])
+		if err != nil {
+			return err
+		}
+		return checkStatus(resp, http.StatusNoContent)
+	},
+}
+
+func init() {
+	formatterCmd.AddCommand(formatterListCmd, formatterRegisterCmd, formatterUnregisterCmd)
+	rootCmd.AddCommand(formatterCmd)
+}
+
+// ---------------------------------------------------------------------------
+// rdw status
+// ---------------------------------------------------------------------------
+
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show server introspection snapshot",
+	RunE:  runStatus,
+}
+
+var statusPaneCmd = &cobra.Command{
+	Use:   "pane <id>",
+	Short: "Show detailed status for a single pane",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runStatusPane,
+}
+
+func init() {
+	statusCmd.Flags().Bool("json", false, "output as JSON")
+	statusPaneCmd.Flags().Bool("json", false, "output as JSON")
+	statusCmd.AddCommand(statusPaneCmd)
+	rootCmd.AddCommand(statusCmd)
+}
+
+func runStatus(cmd *cobra.Command, _ []string) error {
+	rc, err := newRestClient(portFlag(cmd))
+	if err != nil {
+		return err
+	}
+	resp, err := rc.get("/api/v1/status")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body) ; err != nil {
+		return err
+	}
+
+	asJSON, _ := cmd.Flags().GetBool("json")
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(body)
+	}
+
+	printStatus(body)
+	return nil
+}
+
+func runStatusPane(cmd *cobra.Command, args []string) error {
+	rc, err := newRestClient(portFlag(cmd))
+	if err != nil {
+		return err
+	}
+	resp, err := rc.get("/api/v1/status/panes/" + args[0])
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body) ; err != nil {
+		return err
+	}
+
+	asJSON, _ := cmd.Flags().GetBool("json")
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(body)
+	}
+
+	printStatusPane(body)
+	return nil
+}
+
+func printStatus(body map[string]any) {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+
+	fmt.Fprintf(w, "port\t%v\n", body["port"])
+	fmt.Fprintf(w, "connections\t%v\n", body["connections"])
+	fmt.Fprintf(w, "kv_entries\t%v\n", body["kv_len"])
+
+	if cycle, ok := body["cycle"].(map[string]any) ; ok {
+		fmt.Fprintf(w, "cycle.running\t%v\n", cycle["running"])
+		if b, _ := cycle["running"].(bool) ; b {
+			fmt.Fprintf(w, "cycle.windows\t%v\n", cycle["windows"])
+			fmt.Fprintf(w, "cycle.interval_ms\t%v\n", cycle["interval_ms"])
+		}
+	}
+
+	if layouts, ok := body["layouts"].([]any) ; ok {
+		fmt.Fprintf(w, "saved_layouts\t%d\n", len(layouts))
+		for _, l := range layouts {
+			fmt.Fprintf(w, "  -\t%v\n", l)
+		}
+	}
+
+	if fmts, ok := body["formatters"].([]any) ; ok {
+		fmt.Fprintf(w, "formatters\t%d\n", len(fmts))
+		for _, f := range fmts {
+			fmt.Fprintf(w, "  -\t%v\n", f)
+		}
+	}
+
+	if hls, ok := body["highlights"].([]any) ; ok && len(hls) > 0 {
+		fmt.Fprintf(w, "highlight_profiles\t%d\n", len(hls))
+		for _, h := range hls {
+			fmt.Fprintf(w, "  -\t%v\n", h)
+		}
+	}
+
+	if panes, ok := body["panes"].(map[string]any) ; ok {
+		fmt.Fprintf(w, "panes\t%d\n", len(panes))
+		for id, ps := range panes {
+			pm, _ := ps.(map[string]any)
+			title, _ := pm["title"].(string)
+			fmtName, _ := pm["formatter"].(string)
+			sbLen := pm["scrollback_len"]
+			if title != "" {
+				fmt.Fprintf(w, "  %s\t[%s] scrollback=%v formatter=%s\n", id, title, sbLen, fmtName)
+			} else {
+				fmt.Fprintf(w, "  %s\tscrollback=%v formatter=%s\n", id, sbLen, fmtName)
+			}
+		}
+	}
+
+	w.Flush()
+}
+
+func printStatusPane(body map[string]any) {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+
+	fmt.Fprintf(w, "target_id\t%v\n", body["target_id"])
+	fmt.Fprintf(w, "title\t%v\n", body["title"])
+	fmt.Fprintf(w, "formatter\t%v\n", body["formatter"])
+	fmt.Fprintf(w, "saved_formatter\t%v\n", body["saved_formatter"])
+	fmt.Fprintf(w, "scrollback_len\t%v\n", body["scrollback_len"])
+	fmt.Fprintf(w, "scrollback_cap\t%v\n", body["scrollback_cap"])
+	fmt.Fprintf(w, "last_line\t%v\n", body["last_line"])
+
+	if bms, ok := body["bookmarks"].([]any) ; ok {
+		fmt.Fprintf(w, "bookmarks\t%d\n", len(bms))
+		for _, b := range bms {
+			bm, _ := b.(map[string]any)
+			fmt.Fprintf(w, "  %v\tline=%v\n", bm["name"], bm["line_index"])
+		}
+	}
+
+	w.Flush()
+}

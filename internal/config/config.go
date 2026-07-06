@@ -14,14 +14,18 @@ const (
 
 // Config is the top-level server configuration.
 type Config struct {
-	Server   ServerConfig        `yaml:"server"`
-	Auth     AuthConfig          `yaml:"auth"`
-	KV       KVConfig            `yaml:"kv"`
-	Log      LogConfig           `yaml:"log"`
-	// Bindings holds per-action key overrides. The map key is an action name
-	// (e.g. "pane.focus.left") and the value is a list of key strings.
-	// Actions not listed keep their vim-like defaults.
-	Bindings map[string][]string `yaml:"bindings,omitempty"`
+	Server         ServerConfig         `yaml:"server"`
+	Auth           AuthConfig           `yaml:"auth"`
+	KV             KVConfig             `yaml:"kv"`
+	Log            LogConfig            `yaml:"log"`
+	Bindings       map[string][]string  `yaml:"bindings,omitempty"`
+	UserFormatters []UserFormatterConfig `yaml:"formatters,omitempty"`
+}
+
+// UserFormatterConfig defines one user-defined external command formatter.
+type UserFormatterConfig struct {
+	Name string `yaml:"name"`
+	Cmd  string `yaml:"cmd"`
 }
 
 // ServerConfig holds daemon networking and operational settings.
@@ -36,8 +40,9 @@ type ServerConfig struct {
 
 // AuthConfig holds authentication settings.
 type AuthConfig struct {
-	NoAuth         bool `yaml:"no_auth"`
-	AdminLocalOnly bool `yaml:"admin_local_only"`
+	NoAuth         bool   `yaml:"no_auth"`
+	AdminLocalOnly bool   `yaml:"admin_local_only"`
+	AdminToken     string `yaml:"admin_token"`
 }
 
 // KVConfig holds key-value store settings.

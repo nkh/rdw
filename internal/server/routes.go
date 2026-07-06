@@ -99,7 +99,9 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	// Pane swap.
 	authed("POST /api/v1/panes/{id}/swap",   s.handlePaneSwap)
 	authed("PATCH /api/v1/panes/{id}",        s.handlePaneRename)
-	unauth("GET /api/v1/formatters",           http.HandlerFunc(s.handleFormatters))
+	unauth("GET /api/v1/formatters",                   http.HandlerFunc(s.handleFormatters))
+	authed("POST /api/v1/formatters",                  s.handleFormatterRegister)
+	authed("DELETE /api/v1/formatters/{name}",         s.handleFormatterUnregister)
 	authed("POST /api/v1/panes/{id}/format",  s.handlePaneFormat)
 	authed("POST /api/v1/panes/{id}/filters", s.handlePaneFilterAdd)
 	authed("GET /api/v1/panes/{id}/bookmarks",        s.handleBookmarkList)
@@ -113,6 +115,8 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("POST /api/v1/cycle/start",            s.handleCycleStart)
 	authed("POST /api/v1/cycle/stop",             s.handleCycleStop)
 	authed("GET /api/v1/cycle/status",           s.handleCycleStatus)
+	authed("GET /api/v1/status",                 s.handleStatus)
+	authed("GET /api/v1/status/panes/{id}",      s.handleStatusPane)
 
 	// Export (Markdown bundle).
 	authed("POST /api/v1/export/pane",   s.handleExportPane)
@@ -120,6 +124,21 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 	authed("POST /api/v1/export/all",    s.handleExportAll)
 
 	// Admin console.
+	// Admin page — guarded by separate admin token (loopback + admin token).
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		if cfg.adminToken != "" {
+			tok := r.Header.Get("Authorization")
+			if tok != "Bearer "+cfg.adminToken {
+				// Also accept ?token= query param for browser navigation.
+				if r.URL.Query().Get("token") != cfg.adminToken {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+			}
+		}
+		s.handleAdminPage(w, r)
+	})
+
 	admin("GET /api/v1/admin/connections", s.handleAdminConnections)
 
 	// Embedded frontend.
@@ -130,6 +149,7 @@ func routes(mux *http.ServeMux, s *Server, cfg routeConfig) {
 type routeConfig struct {
 	noAuth         bool
 	adminLocalOnly bool
+	adminToken     string
 }
 
 // ---------------------------------------------------------------------------
@@ -1190,7 +1210,7 @@ func (s *Server) handlePaneFilterAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cf, err := pipeline.NewCmdFilter(body.Cmd)
+	cf, err := pipeline.NewCmdFilterWithKV(body.Cmd, s.kv)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1219,3 +1239,315 @@ func (s *Server) handleCycleStatus(w http.ResponseWriter, _ *http.Request) {
 		"interval_ms": interval,
 	})
 }
+
+// handleFormatterRegister registers a new user-defined external formatter.
+func (s *Server) handleFormatterRegister(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+		Cmd  string `json:"cmd"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body) ; err != nil {
+		apiError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if body.Name == "" || body.Cmd == "" {
+		apiError(w, http.StatusBadRequest, "name and cmd are required")
+		return
+	}
+
+	snap := format.KVSnapshot{}
+	for k, v := range s.kv.Snapshot() {
+		snap[k.String()] = v
+	}
+
+	f := format.NewCmdFormatter(body.Name, body.Cmd, snap)
+	if err := format.Register(f) ; err != nil {
+		apiError(w, http.StatusConflict, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleFormatterUnregister removes a user-registered formatter.
+func (s *Server) handleFormatterUnregister(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := format.Unregister(name) ; err != nil {
+		apiError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleStatus returns a full server introspection snapshot.
+func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	snap, _ := s.manager.Snapshot()
+
+	var snapObj map[string]any
+	_ = json.Unmarshal(snap, &snapObj)
+
+	s.cycleMu.Lock()
+	cycleRunning := s.cycleCancel != nil
+	cycleWins    := s.cycleState.Windows
+	cycleMs      := s.cycleState.Interval
+	s.cycleMu.Unlock()
+
+	// Per-pane stats.
+	paneStats := map[string]any{}
+	for _, id := range s.manager.AllPaneIDs() {
+		pl, ok := s.router.Get(id)
+		if !ok {
+			continue
+		}
+
+		_, pane := s.manager.FindPane(id)
+		label := ""
+		formatter := ""
+		if pane != nil {
+			label     = pane.Label
+			formatter = pane.Formatter
+		}
+
+		bms := s.router.Bookmarks(id)
+		bmCount := 0
+		if bms != nil {
+			bmCount = bms.Len()
+		}
+
+		paneStats[id.String()] = map[string]any{
+			"target_id":       id.String(),
+			"title":           label,
+			"formatter":       formatter,
+			"scrollback_len":  pl.Scrollback().Len(),
+			"bookmarks":       bmCount,
+		}
+	}
+
+	// Saved layouts.
+	s.layoutMu.RLock()
+	layouts := make([]string, 0, len(s.layouts))
+	for name := range s.layouts {
+		layouts = append(layouts, name)
+	}
+	s.layoutMu.RUnlock()
+
+	// Active highlight profiles.
+	hlProfiles := make([]string, 0)
+	for _, p := range s.highlights.All() {
+		hlProfiles = append(hlProfiles, p.Name)
+	}
+
+	// Active tokens.
+	tokens := s.tokenStore.List()
+	tokenInfos := make([]map[string]any, 0, len(tokens))
+	for _, t := range tokens {
+		tokenInfos = append(tokenInfos, map[string]any{
+			"id":      t.ID,
+			"panes":   t.Panes,
+			"windows": t.Windows,
+			"expires": t.ExpiresAt,
+		})
+	}
+
+	// Active WebSocket connections.
+	connCount := s.hub.ConnCount()
+
+	// Formatters.
+	formatNames := format.Names()
+
+	jsonResponse(w, map[string]any{
+		"port":         s.port,
+		"session":      snapObj,
+		"panes":        paneStats,
+		"layouts":      layouts,
+		"formatters":   formatNames,
+		"highlights":   hlProfiles,
+		"tokens":       tokenInfos,
+		"connections":  connCount,
+		"cycle": map[string]any{
+			"running":     cycleRunning,
+			"windows":     cycleWins,
+			"interval_ms": cycleMs,
+		},
+		"kv_len": s.kv.Len(),
+	})
+}
+
+// handleStatusPane returns detailed status for a single pane.
+func (s *Server) handleStatusPane(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := session.ParseTargetID(idStr)
+	if err != nil {
+		apiError(w, http.StatusBadRequest, "invalid pane ID: "+err.Error())
+		return
+	}
+
+	pl, ok := s.router.Get(id)
+	if !ok {
+		apiError(w, http.StatusNotFound, "pane not found: "+idStr)
+		return
+	}
+
+	_, pane := s.manager.FindPane(id)
+	label     := ""
+	formatter := ""
+	savedFmt  := ""
+	if pane != nil {
+		label     = pane.Label
+		formatter = pane.Formatter
+		savedFmt  = pane.SavedFormatter
+	}
+
+	bms := s.router.Bookmarks(id)
+	bmList := []any{}
+	if bms != nil {
+		for _, b := range bms.All() {
+			bmList = append(bmList, map[string]any{
+				"name":       b.Name,
+				"line_index": b.LineIndex,
+				"created_at": b.CreatedAt,
+			})
+		}
+	}
+
+	lines := pl.Scrollback().Lines()
+	lastLine := ""
+	if len(lines) > 0 {
+		lastLine = lines[len(lines)-1]
+	}
+
+	jsonResponse(w, map[string]any{
+		"target_id":       idStr,
+		"title":           label,
+		"formatter":       formatter,
+		"saved_formatter": savedFmt,
+		"scrollback_len":  pl.Scrollback().Len(),
+		"scrollback_cap":  pl.Scrollback().Cap(),
+		"last_line":       lastLine,
+		"bookmarks":       bmList,
+	})
+}
+
+// handleAdminPage serves the /admin introspection UI.
+func (s *Server) handleAdminPage(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(adminHTML))
+}
+
+const adminHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>rdw admin</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 13px/1.5 monospace; background: #1a1a1a; color: #ccc; padding: 16px; }
+h1 { color: #fff; margin-bottom: 16px; font-size: 16px; }
+h2 { color: #aaa; margin: 16px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { text-align: left; color: #888; font-weight: normal; padding: 2px 12px 2px 0; border-bottom: 1px solid #333; }
+td { padding: 2px 12px 2px 0; }
+tr:hover td { background: #222; }
+.ok  { color: #5c5; }
+.off { color: #888; }
+.err { color: #c55; }
+#reload { float: right; font: 12px monospace; background: #333; color: #ccc; border: 1px solid #555;
+          padding: 2px 8px; cursor: pointer; }
+#reload:hover { background: #444; }
+</style>
+</head>
+<body>
+<h1>rdw admin <button id="reload" onclick="load()">refresh</button></h1>
+<div id="content">loading...</div>
+<script>
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function row(k, v, cls) {
+  return '<tr><td>' + esc(k) + '</td><td class="' + (cls||'') + '">' + esc(v) + '</td></tr>'
+}
+
+function table(title, rows) {
+  if (!rows.length) return ''
+  var html = '<h2>' + esc(title) + '</h2><table>'
+  html += rows.join('')
+  return html + '</table>'
+}
+
+function load() {
+  var token = new URLSearchParams(location.search).get('token') || ''
+  var headers = token ? {'Authorization': 'Bearer ' + token} : {}
+  fetch('/api/v1/status', {headers: headers})
+    .then(function(r) { return r.json() })
+    .then(function(d) { render(d) })
+    .catch(function(e) { document.getElementById('content').textContent = 'Error: ' + e })
+}
+
+function render(d) {
+  var html = ''
+
+  // Server
+  html += table('Server', [
+    row('port', d.port),
+    row('connections', d.connections),
+    row('kv_entries', d.kv_len),
+  ])
+
+  // Cycle
+  if (d.cycle) {
+    var c = d.cycle
+    html += table('Focus cycle', [
+      row('running', c.running, c.running ? 'ok' : 'off'),
+      c.running ? row('windows', (c.windows||[]).join(', ')) : '',
+      c.running ? row('interval_ms', c.interval_ms) : '',
+    ])
+  }
+
+  // Panes
+  if (d.panes) {
+    var paneRows = []
+    for (var id in d.panes) {
+      var p = d.panes[id]
+      paneRows.push(row(id,
+        'title=' + (p.title||'—') +
+        '  scrollback=' + p.scrollback_len +
+        '  formatter=' + (p.formatter||'text') +
+        '  bookmarks=' + p.bookmarks
+      ))
+    }
+    html += table('Panes (' + paneRows.length + ')', paneRows)
+  }
+
+  // Formatters
+  if (d.formatters) {
+    html += table('Formatters', d.formatters.map(function(f) { return row(f, '') }))
+  }
+
+  // Highlights
+  if (d.highlights && d.highlights.length) {
+    html += table('Highlight profiles', d.highlights.map(function(h) { return row(h, '') }))
+  }
+
+  // Layouts
+  if (d.layouts && d.layouts.length) {
+    html += table('Saved layouts', d.layouts.map(function(l) { return row(l, '') }))
+  }
+
+  // Tokens
+  if (d.tokens) {
+    var trows = d.tokens.map(function(t) {
+      return row(t.id, 'panes=' + JSON.stringify(t.panes) + ' expires=' + t.expires)
+    })
+    html += table('Tokens (' + trows.length + ')', trows)
+  }
+
+  document.getElementById('content').innerHTML = html || '<p>No data</p>'
+}
+
+load()
+setInterval(load, 10000)
+</script>
+</body>
+</html>`

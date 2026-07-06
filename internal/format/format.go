@@ -32,14 +32,44 @@ var registry = map[string]Formatter{
 	NameImage:    &ImageFormatter{},
 }
 
+// builtins records names that cannot be overridden at runtime.
+var builtins = map[string]struct{}{
+	NameText: {}, NameJSON: {}, NameYAML: {},
+	NameMarkdown: {}, NameCSV: {}, NameImage: {},
+}
+
 // Get returns the formatter for the given name, or an error if unknown.
 func Get(name string) (Formatter, error) {
 	f, ok := registry[strings.ToLower(name)]
 	if !ok {
-		return nil, fmt.Errorf("unknown formatter %q; valid names: text, json, yaml, markdown, csv, image", name)
+		return nil, fmt.Errorf("unknown formatter %q", name)
 	}
-
 	return f, nil
+}
+
+// Register adds or replaces a formatter in the registry.
+// Built-in names (text, json, yaml, markdown, csv, image) cannot be overwritten.
+func Register(f Formatter) error {
+	name := strings.ToLower(f.Name())
+	if _, builtin := builtins[name]; builtin {
+		return fmt.Errorf("cannot override built-in formatter %q", name)
+	}
+	registry[name] = f
+	return nil
+}
+
+// Unregister removes a user-registered formatter. Returns an error if the name
+// is built-in or not found.
+func Unregister(name string) error {
+	name = strings.ToLower(name)
+	if _, builtin := builtins[name]; builtin {
+		return fmt.Errorf("cannot unregister built-in formatter %q", name)
+	}
+	if _, ok := registry[name]; !ok {
+		return fmt.Errorf("formatter %q not found", name)
+	}
+	delete(registry, name)
+	return nil
 }
 
 // Names returns all registered formatter names.
@@ -48,7 +78,6 @@ func Names() []string {
 	for k := range registry {
 		names = append(names, k)
 	}
-
 	return names
 }
 

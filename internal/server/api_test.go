@@ -1303,3 +1303,116 @@ func TestAPI_Pane_Title_EmptyRejected(t *testing.T) {
 	resp.Body.Close()
 	assert.Equal(t, 400, resp.StatusCode)
 }
+
+// ---------------------------------------------------------------------------
+// Status endpoints
+// ---------------------------------------------------------------------------
+
+func TestAPI_Status(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	var body map[string]any
+	resp := c.get("/api/v1/status")
+	require.Equal(t, 200, resp.StatusCode)
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+
+	assert.Contains(t, body, "port")
+	assert.Contains(t, body, "connections")
+	assert.Contains(t, body, "kv_len")
+	assert.Contains(t, body, "formatters")
+	assert.Contains(t, body, "cycle")
+	assert.Contains(t, body, "panes")
+}
+
+func TestAPI_StatusPane(t *testing.T) {
+	ts, s := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	_ = s.Manager().CreateWindow("main")
+	_ = s.Manager().AddPane("main", &session.PaneState{
+		TargetID:      mustID("sp1"),
+		ScrollbackCap: 50,
+	})
+	_, _ = s.Router().Register(mustID("sp1"), 50)
+
+	var body map[string]any
+	resp := c.get("/api/v1/status/panes/sp1")
+	require.Equal(t, 200, resp.StatusCode)
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+
+	assert.Equal(t, "sp1", body["target_id"])
+	assert.Contains(t, body, "scrollback_len")
+	assert.Contains(t, body, "scrollback_cap")
+	assert.Contains(t, body, "bookmarks")
+}
+
+func TestAPI_StatusPane_NotFound(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.get("/api/v1/status/panes/ghost")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}
+
+// ---------------------------------------------------------------------------
+// Formatter register / unregister
+// ---------------------------------------------------------------------------
+
+func TestAPI_Formatter_Register_And_List(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/formatters", map[string]string{
+		"name": "myfmt",
+		"cmd":  "cat",
+	})
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+
+	var body map[string]any
+	resp = c.get("/api/v1/formatters")
+	json.NewDecoder(resp.Body).Decode(&body)
+	resp.Body.Close()
+
+	names := body["formatters"].([]any)
+	found := false
+	for _, n := range names {
+		if n.(string) == "myfmt" {
+			found = true
+		}
+	}
+	assert.True(t, found, "myfmt should be in formatter list")
+}
+
+func TestAPI_Formatter_Unregister(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	c.post("/api/v1/formatters", map[string]string{"name": "tmpfmt", "cmd": "cat"})
+
+	resp := c.del("/api/v1/formatters/tmpfmt")
+	resp.Body.Close()
+	assert.Equal(t, 204, resp.StatusCode)
+}
+
+func TestAPI_Formatter_CannotOverrideBuiltin(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.post("/api/v1/formatters", map[string]string{"name": "json", "cmd": "cat"})
+	resp.Body.Close()
+	assert.Equal(t, 409, resp.StatusCode)
+}
+
+func TestAPI_Formatter_UnregisterBuiltinFails(t *testing.T) {
+	ts, _ := newNoAuthServer(t)
+	c := newAPIClient(t, ts, "")
+
+	resp := c.del("/api/v1/formatters/text")
+	resp.Body.Close()
+	assert.Equal(t, 404, resp.StatusCode)
+}

@@ -75,6 +75,8 @@ func init() {
 		"restore the last saved session state on startup")
 	serverStartCmd.Flags().String("kv-persist", "",
 		"path to SQLite file for KV store persistence")
+	serverStartCmd.Flags().String("admin-token", "",
+		"token required to access /admin page (overrides config)")
 }
 
 func runServerStart(cmd *cobra.Command, _ []string) error {
@@ -96,6 +98,10 @@ func runServerStart(cmd *cobra.Command, _ []string) error {
 
 	if v, _ := cmd.Flags().GetBool("no-auth"); v {
 		cfg.Auth.NoAuth = v
+	}
+
+	if v, _ := cmd.Flags().GetString("admin-token"); v != "" {
+		cfg.Auth.AdminToken = v
 	}
 
 	if v, _ := cmd.Flags().GetString("kv-persist"); v != "" {

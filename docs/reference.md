@@ -352,3 +352,98 @@ server. Expiry is a Go duration string: `1h`, `24h`, `7d`. Zero means no expiry.
 
 All bindings are configurable in `~/.config/rdw/config.yaml` under a
 `bindings:` key mapping action names to key strings.
+
+---
+
+## rdw status
+
+```
+rdw status [--json]
+rdw status pane <id> [--json]
+```
+
+Shows a full server introspection snapshot: port, active connections, KV entry count, panes (title, formatter, scrollback length, bookmark count), saved layouts, registered formatters, highlight profiles, active tokens, and focus cycle state.
+
+`rdw status pane ID` shows per-pane detail: title, formatter, saved formatter, scrollback length and cap, last line received, and all bookmarks.
+
+---
+
+## User-defined formatters
+
+A user formatter is an external shell command. It receives the pane scrollback on stdin (one line per line) and must write HTML to stdout. Output is wrapped in a sandboxed iframe so inline scripts cannot reach the rdw SPA.
+
+The current KV snapshot is injected into the subprocess environment with original key names and values. The subprocess is read-only with respect to KV.
+
+Register in config:
+
+```yaml
+formatters:
+  - name: myformat
+    cmd: /usr/local/bin/myformat.sh
+```
+
+Register at runtime:
+
+```
+rdw formatter register myformat "/usr/local/bin/myformat.sh"
+rdw formatter list
+rdw formatter unregister myformat
+```
+
+Via API:
+
+```
+POST   /api/v1/formatters          body:{name, cmd}  → 204
+DELETE /api/v1/formatters/{name}                     → 204
+```
+
+Built-in formatter names (text, json, yaml, markdown, csv, image) cannot be overridden.
+
+---
+
+## Admin web page
+
+Available at `http://localhost:PORT/admin`. Requires a separate admin token distinct from regular session tokens.
+
+Set via config:
+
+```yaml
+auth:
+  admin_token: mysecrettoken
+```
+
+Or via flag:
+
+```
+rdw server start --admin-token mysecrettoken
+```
+
+Access:
+
+```
+http://localhost:7681/admin?token=mysecrettoken
+```
+
+Or with header: `Authorization: Bearer mysecrettoken`
+
+The page auto-refreshes every 10 seconds and shows: server port, active WebSocket connections, KV entry count, pane table (title/formatter/scrollback/bookmarks), formatters, highlight profiles, saved layouts, active tokens, and focus cycle state.
+
+---
+
+## KV and filters
+
+The current KV snapshot is injected into filter subprocess environments using original key names and values. The subprocess is read-only with respect to KV — it cannot write back.
+
+KV injection is dynamic: each line spawns a fresh subprocess with the current snapshot so filters always see up-to-date values.
+
+Example filter that uses a KV value:
+
+```sh
+#!/bin/sh
+# $threshold is set via: rdw kv set threshold 100
+while IFS= read -r line; do
+  echo "[$threshold] $line"
+done
+```
+
+Register: `rdw pipe --id log --filter ./annotate.sh`
