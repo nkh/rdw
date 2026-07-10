@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Worklog — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="worklog.html" class="active">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw development worklog</h1>
+<h2>Session 1 — May 29</h2>
+<p><strong>Requirements analysis and language selection</strong></p>
+<p>Analysed the original bash-rd-based requirements gist. Identified vocabulary inconsistencies (Target ID character set, Filter vs Formatter conflation, undefined KV scope), structural problems (broken command table, missing protocol versioning, informal security language), and ambiguities (backward-compat scope, zero-copy as functional requirement, binary encoding contract).</p>
+<p>Produced 30 improvement suggestions. Rewrote the requirements document incorporating suggestions 2–9, 11, 13–15, 17–18, 20, 23–26, 28, 30. Key additions: WebSocket sub-protocol <code>rdw-v1</code>, REST base path <code>/api/v1/</code>, default port 7681, Unix socket CLI auth, SHA-256 token hashing, gotty restricted-user sandboxing, KV scoping rules, SQLite persistence flag, base64 binary encoding contract, <code>v:</code> verbatim escape, <code>rdw selftest</code> CI smoke command.</p>
+<p>Evaluated Go vs Rust. Selected Go: goroutine-per-pane stream model, single-binary embedding, mature standard library HTTP/WebSocket, fast iteration. Rust reserved for future if memory constraints emerge.</p>
+<h2>Session 2 — May 29 (continued)</h2>
+<p><strong>Project scaffold and dependency proxy</strong></p>
+<p><code>proxy.golang.org</code> unavailable in the build environment. Built a local Go module proxy using <code>codeload.github.com</code> and <code>raw.githubusercontent.com</code> to repackage dependencies as valid Go module zip format. Dependencies proxied: cobra, pflag, gorilla/websocket, yaml.v3, testify, go-spew, go-difflib, mousetrap, cpuguy83/go-md2man, russross/blackfriday, golang.org/x/net.</p>
+<p>Established directory layout. Implemented and tested the first six packages with 100% or near-100% coverage:</p>
+<ul><li><code>internal/session</code> — TargetID validation (<code>[a-zA-Z0-9_][a-zA-Z0-9_ -]*</code>, max 64), ScrollbackBuffer (circular ring, thread-safe, configurable cap)</li>
+<li><code>internal/kvstore</code> — session-scoped KV store, colon-namespaced keys, value/total size limits</li>
+<li><code>internal/control</code> — inline control sequence parser (<code>kv:</code>, <code>f:</code>, <code>b64:</code>, <code>ts:</code>, <code>v:</code>, <code>hl:</code>, <code>bm:</code>, <code>sc:</code>), KVPairs decoder, verbatim passthrough</li>
+<li><code>internal/pipeline</code> — line relay, filter chain (max 8 stages), timestamp toggle, base64 decode, KV dispatch, multiple sinks, context cancellation</li>
+<li><code>internal/auth</code> — SHA-256 hashed tokens, expiry, per-pane scope, revocation, concurrent-safe</li>
+<li><code>internal/config</code> — YAML loader over defaults, full validation</li>
+</ul>
+<p>Wrote README.md and docs/requirements.md. Pushed 10 commits to https://github.com/nkh/rdw.</p>
+<h2>Session 3 — May 31</h2>
+<p><strong>Infrastructure packages</strong></p>
+<ul><li><code>internal/layout</code> — YAML layout schema (WindowSpec, PaneSpec, schema_version gate), Parse, LoadFile, ParseResizeArg. Validates split direction and size.</li>
+<li><code>internal/bindings</code> — 32 named actions, vim-like default binding set (zero key conflicts), Merge/Validate/Lookup/JSON. Key conflict <code>r</code> between layout.reload and pane.rename found and resolved in testing.</li>
+<li><code>internal/selftest</code> — in-process smoke suite, <code>rdw selftest</code> command</li>
+<li><code>internal/discovery</code> — multi-server registry at <code>$XDG_CACHE_HOME/rdw/servers.json</code>, Register/Deregister/PruneStale, Resolve with live HTTP probe</li>
+</ul>
+<p>CLI scaffold: all commands defined with correct flags via cobra. Full cobra tree: <code>server</code>, <code>pipe</code>, <code>kv</code>, <code>token</code>, <code>window</code>, <code>pane</code>, <code>layout</code>, <code>group</code>, <code>save</code>, <code>selftest</code>, <code>completion</code>.</p>
+<p>wrote docs/status.md with phase plan.</p>
+<h2>Session 4 — Jun 1</h2>
+<p><strong>Multi-server, window model, bindings, layout language</strong></p>
+<p>New requirements incorporated:</p>
+<ul><li><code>--port/-p</code> persistent global flag on all commands</li>
+<li>Server discovery: auto-detect running instance, fall back to default port 7681, error if ambiguous with list</li>
+<li>Windows are server-managed views within one browser page (not browser tabs). Window header bar added.</li>
+<li><code>rdw pipe --layout</code> and <code>--window</code> flags: named layout applied on pipe start</li>
+<li>32 keyboard actions with vim-like defaults, configurable via YAML, validated at startup, served as JSON to browser</li>
+<li>Layout description language documented in docs/manual.md</li>
+</ul>
+<p>Wrote docs/manual.md (23 sections): architecture, layout language field reference with 6 annotated examples, interactive editing guide, complete 32-action binding table, control sequence reference, KV namespacing, security model, troubleshooting, annotated config.yaml.</p>
+<h2>Session 5 — Jun 2–3</h2>
+<p><strong>Phase 1: HTTP/WebSocket server</strong></p>
+<ul><li><code>internal/server/hub.go</code> — WebSocket hub, per-connection send channel, token revocation closes live connections, RECONNECT marker on reconnect</li>
+<li><code>internal/server/ws.go</code> — gorilla/websocket write/read pumps, ping/pong keepalive, <code>rdw-v1</code> sub-protocol</li>
+<li><code>internal/server/unix.go</code> — Unix domain socket at <code>$XDG_RUNTIME_DIR/rdw/&lt;id&gt;.sock</code>, 0600 permissions, owner auth</li>
+<li><code>internal/server/middleware.go</code> — token auth middleware, rate limiter (10 req/min unauthenticated), loopback guard for admin endpoints</li>
+<li><code>internal/server/server.go</code> — HTTP server lifecycle, graceful shutdown, signal handling, discovery register/deregister</li>
+</ul>
+<p><strong>Phase 2: Router and Session Manager</strong></p>
+<ul><li><code>internal/router</code> — TargetID-to-pipeline map, Register/Get/Deregister/Route/Stream, AllowUnassigned mode, broadcast sink</li>
+<li><code>internal/session.Manager</code> — ordered window list, active window, AddPane (max 64), RemovePane, FindPane, Snapshot (empty array not null)</li>
+</ul>
+<p><strong>Phase 3: REST API</strong></p>
+<p>Full <code>/api/v1/</code> surface (all endpoints authenticated, rate-limited on unauth routes, loopback-only admin):</p>
+<ul><li><code>GET /api/v1/ping</code>, <code>GET /api/v1/session</code></li>
+<li><code>POST /api/v1/stream/:id</code> — HTTP stream ingest</li>
+<li>Windows: create, close, rename, focus, list</li>
+<li>Panes: split, zoom, resize, close, swap</li>
+<li>Layout: apply, save, list</li>
+<li>KV: set, get, delete, list with prefix filter</li>
+<li>Tokens: create, revoke, list</li>
+<li>Admin: connections</li>
+</ul>
+<p><strong>Phase 3: pipe relay</strong></p>
+<p><code>internal/pipe</code> — client-side relay: prefers Unix socket (owner auth), falls back to HTTP Bearer token. Reconnect queue buffers up to 1000 lines, flushes in order on RECONNECT, drops oldest on overflow.</p>
+<p>All CLI commands wired to live server via REST or Unix socket. <code>rdw selftest</code> extended to 11 in-process checks covering server ping.</p>
+<p>244 tests, 67.3% coverage.</p>
+<h2>Session 6 — Jun 5–7</h2>
+<p><strong>Phase 4: Browser SPA</strong> (<code>internal/server/frontend.go</code>, ~1200 lines)</p>
+<p>Complete single-page application embedded in the binary:</p>
+<ul><li>CSS dark theme with CSS variables; pane grid via CSS <code>grid-template-columns/rows</code>, rebuilt on every <code>layout_update</code> WebSocket message</li>
+<li>Gutter drag-to-resize: <code>mousedown</code> on <code>.gutter-v/.gutter-h</code>, tracks delta as percentage, updates grid live</li>
+<li>ANSI colour parser: full 16/256/true-colour; escape sequences → inline CSS <code>color:</code>/<code>background:</code> spans</li>
+<li>Scrollback: per-pane DOM ring buffer capped at 10,000 lines, auto-scroll when within 40px of bottom</li>
+<li>WebSocket client: <code>rdw-v1</code> sub-protocol, auto-reconnect every 2s, client-side reconnect queue flushed on RECONNECT marker</li>
+<li>32-action keyboard dispatch: reads <code>/api/v1/bindings</code> on startup, single-key and two-key sequences (<code>g t</code>, <code>g g</code>)</li>
+<li>Mode state machine: normal / swap / search</li>
+<li>Search overlay: <code>/</code> opens, regex on pane text, <code>n</code>/<code>N</code> navigate, <code>scrollIntoView</code></li>
+<li>Right-click context menu: zoom, split, rename, clear, close</li>
+<li>Window header bar: rendered list, active highlighted, click to switch</li>
+</ul>
+<p>Additional endpoints and packages:</p>
+<ul><li><code>GET /api/v1/bindings</code> — serves binding map as JSON</li>
+<li><code>internal/export</code> — <code>Bundle()</code> writes Markdown + <code>assets/</code> with decoded images; <code>POST /api/v1/export/pane|window|all</code></li>
+<li>Group/swap endpoints: <code>POST /api/v1/groups/{name}/kill|hide|show|focus</code>, <code>POST /api/v1/panes/{id}/swap</code></li>
+<li><code>Pipeline.Scrollback()</code> accessor for export path</li>
+</ul>
+<p>270 tests, 68.5% coverage, 11/11 selftest.</p>
+<h2>Session 7 — Jun 8–10</h2>
+<p><strong>Phase 5: Formatters</strong> (<code>internal/format</code>)</p>
+<p>Six formatters, each implementing <code>Formatter</code> interface (<code>Format([]string) (string, error)</code>):</p>
+<ul><li><code>text</code> — HTML-escaped <code>&lt;pre&gt;</code>, ANSI handled client-side</li>
+<li><code>json</code> — per-line parse + pretty-print + token-level CSS classes (key, string, number, literal, punct)</li>
+<li><code>yaml</code> — multi-document split on <code>---</code>, canonical re-marshal, key/value CSS classes</li>
+<li><code>markdown</code> — single-pass renderer: headings, bold, italic, inline code, code fences, lists, blockquotes, links</li>
+<li><code>csv</code> — auto-detect CSV/TSV delimiter, header row as <code>&lt;th&gt;</code>, data rows as <code>&lt;td&gt;</code></li>
+<li><code>image</code> — base64 decode (standard + URL-safe), magic-byte MIME detection (PNG/JPEG/GIF/SVG/WebP), inline <code>&lt;img&gt;</code></li>
+</ul>
+<p>Formatter endpoints: <code>GET /api/v1/formatters</code>, <code>POST /api/v1/panes/{id}/format</code>.</p>
+<p><strong>Phase 6: KV SQLite persistence</strong> (<code>internal/kvstore/persist.go</code>)</p>
+<ul><li><code>OpenDB(path)</code> — opens or creates SQLite DB with WAL journal</li>
+<li><code>Load(store)</code> — reads all rows into in-memory store on <code>--restore</code></li>
+<li><code>Persist(k, v)</code> — upsert on every <code>PUT /api/v1/kv/{key}</code></li>
+<li><code>Remove(k)</code> — delete on every <code>DELETE /api/v1/kv/{key}</code></li>
+<li><code>--kv-persist &lt;path&gt;</code> and <code>--restore</code> wired into <code>server.Options</code></li>
+<li><code>kvDB</code> field on <code>Server</code>, opened at <code>Run</code> start, closed on shutdown</li>
+</ul>
+<p><strong>Phase 7: Stream mirroring</strong> (<code>internal/mirror</code>)</p>
+<ul><li><code>FileSync(path)</code> — append-open sink</li>
+<li><code>CmdSync(cmdStr)</code> — <code>sh -c</code> subprocess, stdin pipe as sink</li>
+<li><code>Tee(r, sink)</code> — goroutine copies every read to sink without buffering the main path</li>
+<li><code>--forward-to-file</code> and <code>--forward-to-cmd</code> wired into <code>runPipe</code></li>
+</ul>
+<p><strong>Open-browser</strong> (<code>internal/browser</code>)</p>
+<ul><li><code>Open(url)</code> — platform dispatch: <code>xdg-open</code> (Linux), <code>open</code> (macOS), <code>rundll32</code> (Windows)</li>
+<li><code>--open-browser</code> flag wired in <code>runServerStart</code></li>
+</ul>
+<p>331 tests, 70.1% coverage, 11/11 selftest.</p>
+<h2>Session 8 — Jun 11 (restored after reset)</h2>
+<p><strong>Scrollback bookmarks</strong> (<code>internal/session/bookmark.go</code>)</p>
+<ul><li><code>BookmarkStore</code> — named bookmarks keyed by string, stores <code>{name, line_index, created_at}</code></li>
+<li><code>Add</code>, <code>Remove</code>, <code>Get</code>, <code>All</code> (sorted by <code>line_index</code>), <code>Len</code></li>
+<li>Integrated into <code>Router</code>: one <code>BookmarkStore</code> per registered pipeline, cleaned up on deregister</li>
+<li>API: <code>GET /api/v1/panes/{id}/bookmarks</code>, <code>PUT /api/v1/panes/{id}/bookmarks/{name}</code>, <code>DELETE /api/v1/panes/{id}/bookmarks/{name}</code></li>
+</ul>
+<p><strong>Regex highlight profiles</strong> (<code>internal/highlight</code>)</p>
+<ul><li><code>Store</code> — named <code>Profile</code> set, each profile is an ordered list of <code>{pattern, class}</code> rules</li>
+<li><code>Add</code> validates every regex at store time; rejects empty name or class</li>
+<li><code>Remove</code>, <code>Get</code>, <code>All</code>, <code>Len</code></li>
+<li>Held in <code>Server.highlights</code></li>
+<li>API: <code>GET /api/v1/highlights</code>, <code>PUT /api/v1/highlights/{name}</code>, <code>DELETE /api/v1/highlights/{name}</code></li>
+</ul>
+<p><strong>Pane rename</strong></p>
+<ul><li><code>Label</code> field added to <code>session.PaneState</code></li>
+<li><code>PATCH /api/v1/panes/{id}</code> sets <code>pane.Label</code> and broadcasts <code>layout_update</code></li>
+</ul>
+<p>317 tests, 67.2% coverage, 11/11 selftest.</p>
+<h2>Session 9 — Jun 15 (restoration complete)</h2>
+<p><strong>gotty terminal pane</strong> (<code>internal/terminal</code>)</p>
+<ul><li><code>Manager</code> tracks active subprocesses and allocates ports from a base offset</li>
+<li><code>Launch(id, cmd)</code> runs <code>ttyd --once su -s /bin/sh nobody -c cmd</code>; falls back to socat for environments without ttyd; fails loudly if neither is available</li>
+<li><code>Kill(id)</code> stops the process and frees the slot</li>
+<li><code>POST /api/v1/panes/{id}/terminal</code> — launches and returns <code>{id, port, url}</code></li>
+<li><code>DELETE /api/v1/panes/{id}/terminal</code> — kills the subprocess</li>
+</ul>
+<p><strong>Focus cycle automation</strong> (<code>internal/cycle</code>)</p>
+<ul><li><code>Cycle</code> holds an ordered window list and a dwell interval</li>
+<li><code>Run(ctx)</code> sends <code>Event{Window}</code> on a channel, advances index on each tick, closes channel on cancel</li>
+<li>Wired into server as <code>POST /api/v1/cycle/start</code> and <code>POST /api/v1/cycle/stop</code></li>
+<li>Start accepts <code>{windows: [...], interval_ms: N}</code>; cancels any existing cycle before starting</li>
+</ul>
+<p><strong>bash-rd <code>--forward</code> compatibility</strong></p>
+<ul><li><code>--forward rd|rdw|both</code> flag now wired in <code>runPipe</code></li>
+<li><code>rd</code> and <code>both</code> modes tee stdin through <code>mirror.CmdSync(&#34;rd&#34;)</code> before relaying to rdw</li>
+</ul>
+<p><strong>Man page</strong> (<code>man/rdw.1</code>)</p>
+<ul><li>Full groff man page covering all commands, options, control sequences, auth model, environment variables, and file paths</li>
+</ul>
+<p><strong>Goreleaser</strong> (<code>.goreleaser.yaml</code>)</p>
+<ul><li>Linux + macOS, amd64 + arm64</li>
+<li>Archives include README, docs/, man/rdw.1</li>
+<li>Homebrew tap stub for <code>nkh/homebrew-tap</code></li>
+</ul>
+<p><strong>CSV table sort</strong> (frontend.go)</p>
+<ul><li>Event-delegated click handler on <code>rdw-csv-table</code> <code>&lt;th&gt;</code> elements</li>
+<li>Numeric vs lexicographic detection via <code>parseFloat</code></li>
+<li>Toggle ascending/descending on repeated click; <code>sort-asc</code>/<code>sort-desc</code> CSS class markers</li>
+</ul>
+<p>327 tests, 11/11 selftest, all items from &#34;Not yet implemented&#34; resolved.</p>
+<h2>Session 10 — final fixes</h2>
+<ul><li><code>bm:</code>, <code>hl:</code>, <code>sc:</code>, <code>b64:</code> control sequences: parser extended to multi-char prefixes, all four dispatched in pipeline and server control handler</li>
+<li><code>highlight_set</code> and <code>scrollback_ctl</code> WebSocket messages handled in browser SPA; <code>applyHighlightProfile</code> JS function added</li>
+<li><code>handleLayoutApply</code> stub replaced with real <code>RestoreSnapshot</code> call — layout apply now reconstructs session state</li>
+<li><code>rdw pane swap</code> CLI wired to <code>POST /api/v1/panes/{id}/swap</code></li>
+<li><code>strings.Title</code> (deprecated) replaced with <code>strings.ToUpper(a[:1]) + a[1:]</code></li>
+<li>README updated: control sequences table, bookmarks, highlights, stream mirroring, focus cycle, terminal panes sections added</li>
+<li>353 tests, 11/11 selftest, zero stubs, <code>go vet</code> clean</li>
+</ul>
+
+<div id="nav-bar"><a href="improvements.html">← Improvements</a><span></span></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Improvements — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html" class="active">Improvements</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw — remaining work and improvements</h1>
+<h2>What is left to do</h2>
+<p>All previously listed items are now resolved:</p>
+<ul><li><code>rdw pipe --filter CMD</code> — implemented: <code>pipeline.CmdFilter</code>, <code>POST /api/v1/panes/{id}/filters</code>, <code>--filter</code> flag on <code>rdw pipe</code></li>
+<li><code>rdw pipe --layout FILE</code> schema_version validation — added: client validates <code>schema_version == 1</code> before upload</li>
+<li>Layout apply router reconciliation — implemented: <code>handleLayoutApply</code> diffs pane sets and calls <code>Deregister</code>/<code>Register</code></li>
+<li><code>sc:clear</code> end-to-end test — added: <code>TestAPI_ScrollbackClear_EmptiesBuffer</code></li>
+<li><code>rdw cycle status</code> — implemented: <code>GET /api/v1/cycle/status</code>, <code>rdw cycle status</code> CLI command</li>
+</ul>
+<h2>50 improvements</h2>
+<h3>Pipeline</h3>
+<ol><li><code>rdw pipe --filter CMD</code> — attach an external filter (any shell command reading stdin, writing stdout) to the pipeline at runtime</li>
+<li>Named filter presets stored server-side, applicable per-pane via <code>POST /api/v1/panes/{id}/filters</code></li>
+<li>Filter introspection endpoint — <code>GET /api/v1/panes/{id}/filters</code> lists active stages</li>
+<li>Backpressure from the WebSocket Hub to slow pipelines instead of silent line drops</li>
+<li>Per-pane overflow policy configurable at pane creation: <code>drop-oldest</code>, <code>drop-newest</code>, <code>block</code></li>
+<li>Per-TargetID rate limit to prevent one noisy source from starving others</li>
+<li>Line batching — flush multiple lines in a single WebSocket frame when source rate exceeds 60 fps</li>
+<li><code>rdw pipe --replay FILE [--speed N]</code> — replay a saved log at wall-clock or Nx speed</li>
+</ol>
+<h3>Browser SPA</h3>
+<ol><li>Dark/light theme toggle, defaulting to <code>prefers-color-scheme</code></li>
+<li>Per-pane font size and font family, adjustable in the browser</li>
+<li>Pane-scoped search — current <code>/</code> searches all panes; add a flag to scope to the focused pane</li>
+<li>Search history — up-arrow in the search input recalls previous patterns</li>
+<li>Highlight rules applied live as new lines arrive, not only on <code>hl:</code> sequence arrival</li>
+<li>Pane timestamp overlay toggle from the browser UI</li>
+<li>Copy-to-clipboard button per pane</li>
+<li>Pane pinning — keep a pane visible across window switches</li>
+<li>WebSocket connection status indicator in the window header</li>
+<li>Unread badge on window tab when new lines arrive in a non-active window</li>
+<li>Mobile-responsive layout — single-column on narrow viewports</li>
+<li>Keyboard binding help overlay (<code>?</code> key) rendered as a table — currently absent from the SPA</li>
+</ol>
+<h3>Layout</h3>
+<ol><li>Layout import by file drag-and-drop in the browser</li>
+<li>Layout diff view — show what changed when <code>layout apply</code> is called</li>
+<li>Named layout snapshots with timestamps, not just a flat name map</li>
+<li>Pane group collapse/expand in the browser without closing panes</li>
+<li>Grid snap-to-percent during gutter drag</li>
+<li>Layout templates — predefined skeletons selectable from the browser (2-col, dashboard, etc.)</li>
+<li>Per-window pane count limit as a layout field, not a global constant</li>
+</ol>
+<h3>KV store</h3>
+<ol><li>KV change notifications over WebSocket — subscribe to a key prefix and receive updates</li>
+<li>Per-key TTL with automatic expiry</li>
+<li>KV namespace operations — list all keys under a prefix, delete-all for a namespace</li>
+<li>KV import/export endpoint — JSON dump and restore of all keys</li>
+<li>KV size and entry count reported in <code>GET /api/v1/session</code></li>
+</ol>
+<h3>Auth and security</h3>
+<ol><li>Read-only token scope — allows stream viewing but no mutations</li>
+<li>Token rotation — atomically create a replacement and revoke the old in one call</li>
+<li>HTTPS support — configurable cert path or auto-generated self-signed cert</li>
+<li>CORS origin allowlist in config for cross-origin browser access</li>
+<li>Rate limit configuration in <code>config.yaml</code> — currently hardcoded at 10 req/min</li>
+<li>Audit log — append-only record of all auth events and API mutations</li>
+</ol>
+<h3>Export and formatters</h3>
+<ol><li>PDF export via headless Chromium or wkhtmltopdf</li>
+<li>HTML export — self-contained file including the SPA for offline replay</li>
+<li>JSON Lines formatter — one collapsible tree per line</li>
+<li>Diff formatter — unified diff between consecutive JSON or text snapshots</li>
+<li>SQL formatter with syntax highlighting</li>
+<li>Image slideshow mode — cycle multiple <code>b64:</code> frames in the same pane</li>
+</ol>
+<h3>Operations</h3>
+<ol><li><code>SIGHUP</code> config reload without restart</li>
+<li>Prometheus metrics endpoint — line counts per pane, connection count, KV size</li>
+<li>Structured JSON server log with configurable level</li>
+<li>Session persistence — save and restore the full window/pane layout across restarts</li>
+<li><code>rdw server start --demo</code> — start with synthetic data for UI testing</li>
+</ol>
+<h3>Protocol</h3>
+<ol><li><code>rdw pipe</code> reconnect with exponential backoff instead of a fixed 2-second interval</li>
+</ol>
+
+<div id="nav-bar"><a href="code-review.html">← Code Review</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>

@@ -2024,3 +2024,289 @@ If a `=:` sequence does not appear to write to the store, check:
 The Target ID in `--id` is not in the active layout and `--allow-unassigned`
 was not passed. Either add the Target ID to the layout or pass
 `--allow-unassigned`.
+
+---
+
+## 24. Pane Titles
+
+Every pane has a display title shown in its header bar. The title is separate from the Target ID — it is a human-readable label. The Target ID is used for stream routing and never changes; the title can be changed at any time.
+
+### Setting a title
+
+**On connect:**
+
+```sh
+make build 2>&1 | rdw pipe --id build --title "Build Log"
+```
+
+**Inline from the stream:**
+
+```sh
+echo "title:Deploy Pipeline" | rdw pipe --id deploy
+```
+
+**From the CLI at any time:**
+
+```sh
+rdw pane rename build "Build — release branch"
+```
+
+**From the browser:** double-click the pane header to edit the title inline. Press Enter to confirm, Escape to cancel.
+
+**Via the API:**
+
+```sh
+curl -X PATCH http://localhost:7681/api/v1/panes/build \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"title":"Build Log"}'
+```
+
+The `label` field is also accepted for backward compatibility.
+
+### In layouts
+
+```yaml
+schema_version: 1
+windows:
+  - name: ci
+    panes:
+      - target_id: build
+        split: h
+```
+
+The title is set separately via `rdw pane rename` or the `title:` sequence after the stream connects.
+
+---
+
+## 25. Image and SVG Display
+
+### Sending images via sentinel framing
+
+The `image:` / `image:end` pair sends raw binary to a pane. rdw base64-encodes it internally so the source process does not need to:
+
+```sh
+{ echo "image:" ; cat chart.png ; echo "image:end" ; } | rdw pipe --id chart
+```
+
+SVG works the same way and is rendered as inline HTML (fully interactive):
+
+```sh
+{ echo "svg:" ; cat diagram.svg ; echo "svg:end" ; } | rdw pipe --id diagram
+```
+
+### Sending files with `rdw send`
+
+The simplest way. Type detection is automatic from magic bytes then extension:
+
+```sh
+rdw send --id chart   chart.png        # PNG/JPEG/GIF/WebP → image_render
+rdw send --id diagram diagram.svg      # SVG → svg_render (inline)
+rdw send --id table   report.csv       # CSV → sortable table
+rdw send --id docs    README.md        # Markdown → rendered HTML
+rdw send --id log     output.txt       # Plain text → appended lines
+```
+
+### Scaling
+
+Control how images and SVGs fill the pane:
+
+| Sequence | Effect |
+| --- | --- |
+| `scale:fit` | width 100%, height auto (default) |
+| `scale:fill` | width 100%, height 100% |
+| `scale:native` | intrinsic size, scrollable |
+
+```sh
+echo "scale:fill" | rdw pipe --id chart
+```
+
+The formatter save/restore is automatic: the active formatter before an `image:` or `svg:` block is saved, the display formatter is switched to `image` or `svg`, the content is rendered, then the original formatter is restored.
+
+---
+
+## 26. Filters and KV Integration
+
+### What filters do
+
+A filter is an external shell command attached to a pipeline stage. Each line is written to the command's stdin; the command's stdout replaces the line. Filters run server-side before lines reach the scrollback or the browser.
+
+```sh
+# Attach a filter that uppercases all lines
+your_script | rdw pipe --id log --filter 'tr a-z A-Z'
+
+# Chain multiple filters
+your_script | rdw pipe --id log \
+  --filter 'grep -v DEBUG' \
+  --filter 'sed s/ERROR/\[ERR\]/'
+```
+
+Maximum 8 filter stages per pipeline.
+
+### KV injection into filters
+
+The current session KV snapshot is injected into each filter subprocess as environment variables using original key names:
+
+```sh
+rdw kv set threshold 100
+rdw kv set prefix "[build]"
+```
+
+A filter script can then read them:
+
+```sh
+#!/bin/sh
+while IFS= read -r line; do
+  echo "$prefix $line"   # $prefix comes from KV
+done
+```
+
+KV injection is dynamic: the snapshot is refreshed on every line so filters always see current values. Filters are read-only with respect to KV — they cannot write back.
+
+---
+
+## 27. User-Defined Formatters
+
+### What they are
+
+A user formatter is an external shell command that receives pane scrollback on stdin (one line per input line) and writes HTML to stdout. The output is embedded in a sandboxed `<iframe>` so inline scripts in the formatter output cannot reach the rdw SPA.
+
+The current KV snapshot is injected into the formatter subprocess environment, same as filters.
+
+### Registration
+
+**In config** (available on every server start):
+
+```yaml
+formatters:
+  - name: myformat
+    cmd: /usr/local/bin/myformat.sh
+  - name: logcolor
+    cmd: "awk '{print \"<span style=color:\"($1==\"ERROR\"?\"red\":\"white\")\">\" $0 \"</span>\"}'"
+```
+
+**At runtime:**
+
+```sh
+rdw formatter register myformat '/usr/local/bin/myformat.sh'
+rdw formatter list
+rdw formatter unregister myformat
+```
+
+**Via API:**
+
+```sh
+curl -X POST http://localhost:7681/api/v1/formatters \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"myformat","cmd":"/usr/local/bin/myformat.sh"}'
+```
+
+### Using a user formatter
+
+Once registered, it is used exactly like a built-in formatter:
+
+```sh
+echo "f:myformat" | rdw pipe --id log
+
+# or via API
+curl -X POST http://localhost:7681/api/v1/panes/log/format \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"formatter":"myformat"}'
+```
+
+Built-in formatter names (text, json, yaml, markdown, csv, image) cannot be overridden.
+
+### Writing a formatter
+
+The formatter receives lines on stdin, one per line. It must write complete, valid HTML to stdout. Example in Python:
+
+```python
+#!/usr/bin/env python3
+import sys
+print('<div class="my-output">')
+for line in sys.stdin:
+    line = line.rstrip()
+    cls = "err" if "ERROR" in line else "ok" if "PASS" in line else "line"
+    print(f'<span class="{cls}">{line}</span><br>')
+print('</div>')
+```
+
+---
+
+## 28. Server Introspection
+
+### `rdw status`
+
+Shows a full server snapshot in a tabular format:
+
+```sh
+rdw status
+rdw status --json        # machine-readable JSON
+```
+
+Output covers: port, active browser connections, KV entry count, all panes (title, formatter, scrollback length, bookmark count), saved layouts, registered formatters, highlight profiles, active tokens, and focus cycle state.
+
+### `rdw status pane ID`
+
+Per-pane detail:
+
+```sh
+rdw status pane build-log
+rdw status pane build-log --json
+```
+
+Shows: target ID, title, active formatter, saved formatter, scrollback length and cap, last line received, and all named bookmarks with their line indices.
+
+### `/admin` web page
+
+A browser-based introspection dashboard at `http://localhost:PORT/admin`. It auto-refreshes every 10 seconds and shows the same information as `rdw status`.
+
+The admin page requires a separate token distinct from regular session tokens:
+
+```yaml
+# config.yaml
+auth:
+  admin_token: mysecrettoken
+```
+
+Or via flag:
+
+```sh
+rdw server start --admin-token mysecrettoken
+```
+
+Access via browser: `http://localhost:7681/admin?token=mysecrettoken`
+
+Access via curl: `curl -H "Authorization: Bearer mysecrettoken" http://localhost:7681/admin`
+
+The admin token is intentionally separate from session tokens so introspection access can be granted independently of stream write access.
+
+---
+
+## 29. Focus Cycle
+
+Automatically rotate browser focus through a list of windows at a fixed interval. Useful for wall-screen dashboards.
+
+```sh
+# Start cycling every 10 seconds
+rdw cycle start build logs metrics --interval-ms 10000
+
+# Check cycle state
+rdw cycle status
+
+# Stop
+rdw cycle stop
+```
+
+Via API:
+
+```sh
+curl -X POST http://localhost:7681/api/v1/cycle/start \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"windows":["build","logs","metrics"],"interval_ms":10000}'
+
+curl http://localhost:7681/api/v1/cycle/status \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X POST http://localhost:7681/api/v1/cycle/stop \
+  -H "Authorization: Bearer $TOKEN"
+```

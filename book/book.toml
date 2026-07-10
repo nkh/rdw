@@ -1,0 +1,8 @@
+[book]
+title = "rdw"
+description = "Remote Display Web — pipe process output into a live browser layout"
+authors = ["nkh"]
+language = "en"
+
+[output.html]
+default-theme = "navy"

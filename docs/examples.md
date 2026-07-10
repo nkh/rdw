@@ -266,3 +266,120 @@ curl -X PUT -H "$AUTH" $BASE/highlights/errors \
 # Format pane content
 curl -X POST -H "$AUTH" $BASE/panes/log/format -d '{"formatter":"json"}'
 ```
+
+## Pane titles
+
+```sh
+# Set on connect
+make build 2>&1 | rdw pipe --id build --title "CI Build"
+
+# Set inline from stream
+echo "title:Deploy v2.3" | rdw pipe --id deploy
+
+# Rename from CLI
+rdw pane rename build "Build — main branch"
+
+# Double-click the pane header in the browser to edit inline
+```
+
+## Images and SVG
+
+```sh
+# Send a PNG (rdw handles base64 internally)
+{ echo "image:" ; cat screenshot.png ; echo "image:end" ; } | rdw pipe --id screen
+
+# Send an SVG (fully interactive in browser, click/hover work)
+{ echo "svg:" ; gnuplot -e "set terminal svg; plot sin(x)" ; echo "svg:end" ; } | rdw pipe --id plot
+
+# Simplest: use rdw send (auto-detects type)
+rdw send --id chart   chart.png
+rdw send --id diagram flow.svg
+rdw send --id data    results.csv
+
+# Control scaling
+echo "scale:fill"   | rdw pipe --id chart   # fill the pane
+echo "scale:native" | rdw pipe --id chart   # intrinsic size, scroll
+echo "scale:fit"    | rdw pipe --id chart   # width 100% (default)
+```
+
+## Filters with KV
+
+```sh
+# Set a KV value that filters can read
+rdw kv set env production
+rdw kv set prefix "[PROD]"
+
+# The filter sees $env and $prefix as environment variables
+my_app | rdw pipe --id log --filter 'while read l; do echo "$prefix $l"; done'
+
+# Chain: first filter errors only, second annotates with env
+my_app | rdw pipe --id log \
+  --filter 'grep -E "ERROR|WARN"' \
+  --filter 'while read l; do echo "[$env] $l"; done'
+```
+
+## User-defined formatters
+
+```sh
+# Register a formatter from a script
+rdw formatter register colorlog ./formatters/colorlog.sh
+
+# List all (built-in + user-defined)
+rdw formatter list
+
+# Apply it to a pane
+echo "f:colorlog" | rdw pipe --id log
+
+# Or via API
+curl -X POST http://localhost:7681/api/v1/panes/log/format \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"formatter":"colorlog"}'
+
+# Remove when done
+rdw formatter unregister colorlog
+```
+
+Example formatter script (`formatters/colorlog.sh`):
+
+```sh
+#!/bin/sh
+echo '<div class="log">'
+while IFS= read -r line; do
+  case "$line" in
+    *ERROR*) echo "<span class='err'>$line</span><br>" ;;
+    *WARN*)  echo "<span class='warn'>$line</span><br>" ;;
+    *)       echo "<span class='info'>$line</span><br>" ;;
+  esac
+done
+echo '</div>'
+```
+
+## Server introspection
+
+```sh
+# Full snapshot
+rdw status
+
+# Machine-readable
+rdw status --json | jq .panes
+
+# Per-pane detail
+rdw status pane build-log
+
+# Open the admin web UI (requires --admin-token on server start)
+rdw server start --admin-token secret
+open http://localhost:7681/admin?token=secret
+```
+
+## Focus cycle (wall-screen rotation)
+
+```sh
+# Cycle through three windows every 15 seconds
+rdw cycle start build logs metrics --interval-ms 15000
+
+# Check what's running
+rdw cycle status
+
+# Stop
+rdw cycle stop
+```

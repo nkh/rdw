@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CLI Commands — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="cli.html" class="active">CLI Commands</a></li><li><a href="control.html">Control Sequences</a></li><li><a href="api.html">REST API</a></li><li><a href="websocket.html">WebSocket Protocol</a></li><li><a href="layout.html">Layout Schema</a></li><li><a href="config.html">Configuration</a></li><li><a href="bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="../dev/architecture.html">Architecture</a></li><li><a href="../dev/onboarding.html">Onboarding</a></li><li><a href="../dev/code-review.html">Code Review</a></li><li><a href="../dev/improvements.html">Improvements</a></li><li><a href="../dev/worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw reference</h1>
+<h2>CLI commands</h2>
+<p>All commands accept <code>--port / -p PORT</code> (default 7681) to address a specific server instance.</p>
+<h3>rdw server</h3>
+<pre><code>rdw server start [flags]
+  --port           TCP port to listen on (default 7681)
+  --open-browser   Open the browser UI on startup
+  --no-auth        Disable token authentication
+  --kv-persist PATH  Enable SQLite KV persistence at PATH
+  --restore        Load persisted KV store on startup
+
+rdw server stop
+rdw server list
+</code></pre>
+<h3>rdw pipe</h3>
+<pre><code>rdw pipe --id TARGET_ID [flags]
+  --id             Target pane identifier (required)
+  --layout NAME    Apply layout before streaming
+  --window NAME    Route into a specific window
+  --forward MODE   Also forward to: rd, rdw, or both
+  --forward-to-file PATH   Mirror stream to file or FIFO
+  --forward-to-cmd CMD     Mirror stream as stdin to shell command
+</code></pre>
+<p><code>rdw pipe</code> reads from its stdin (the piped process&#39;s stdout) line by line and relays each line to the named pane. It connects via Unix socket first; falls back to HTTP with Bearer token.</p>
+<h3>rdw window</h3>
+<pre><code>rdw window create NAME
+rdw window close NAME
+rdw window rename OLD NEW
+rdw window focus NAME
+rdw window list
+</code></pre>
+<h3>rdw pane</h3>
+<pre><code>rdw pane split ID [--dir h|v]
+rdw pane resize ID SIZE       SIZE: N (cols/rows), Npx, N%
+rdw pane zoom ID
+rdw pane swap ID1 ID2
+rdw pane rename ID TITLE
+rdw pane close ID
+</code></pre>
+<h3>rdw kv</h3>
+<pre><code>rdw kv set KEY VALUE
+rdw kv get KEY
+rdw kv delete KEY
+rdw kv list [PREFIX]
+</code></pre>
+<p>Keys: <code>[a-zA-Z0-9_][a-zA-Z0-9_ -]*</code> (max 64 chars). Optional namespace prefix: <code>window:NAME:key</code> or <code>pane:ID:key</code>.</p>
+<h3>rdw token</h3>
+<pre><code>rdw token create [--scope SCOPE] [--expires DURATION]
+rdw token revoke ID
+rdw token list
+</code></pre>
+<h3>rdw layout</h3>
+<pre><code>rdw layout apply NAME|PATH
+rdw layout save NAME
+rdw layout list
+</code></pre>
+<h3>rdw group</h3>
+<pre><code>rdw group hide NAME
+rdw group show NAME
+rdw group focus NAME
+rdw group kill NAME
+</code></pre>
+<h3>rdw save</h3>
+<pre><code>rdw save DIR [--pane ID] [--window NAME]
+</code></pre>
+<p>Exports scrollback as Markdown to DIR. Images are saved in DIR/assets/.</p>
+<h3>rdw selftest</h3>
+<p>Runs 11 in-process smoke checks and exits 0 if all pass.</p>
+<h3>rdw completion</h3>
+<pre><code>rdw completion bash
+</code></pre>
+<hr>
+<h2>Control sequences</h2>
+<p>Lines piped through <code>rdw pipe</code> that begin with a recognised prefix are intercepted and acted on rather than displayed.</p>
+<table>
+<tr><th>Prefix</th><th>Action</th></tr>
+<tr><td><code>v:PAYLOAD</code></td><td>Verbatim — strip prefix, display PAYLOAD as-is</td></tr>
+<tr><td><code>=:k=v;k2=v2</code></td><td>Write key-value pairs to the KV store</td></tr>
+<tr><td><code>f:NAME</code></td><td>Set pane formatter (text/json/yaml/markdown/csv/image)</td></tr>
+<tr><td><code>b64:DATA</code></td><td>Base64-encoded binary data; decoded by export and image formatter</td></tr>
+<tr><td><code>bm:NAME</code></td><td>Create a scrollback bookmark at the current line</td></tr>
+<tr><td><code>hl:PROFILE</code></td><td>Apply the named highlight profile to the pane</td></tr>
+<tr><td><code>sc:ACTION</code></td><td>Scrollback control: clear / top / bottom</td></tr>
+<tr><td><code>image:</code> ... <code>image:end</code></td><td>Sentinel-framed binary block; rdw base64-encodes internally</td></tr>
+<tr><td><code>svg:</code> ... <code>svg:end</code></td><td>Sentinel-framed UTF-8 SVG; rendered inline in browser</td></tr>
+<tr><td><code>scale:MODE</code></td><td>Image/SVG scaling: fit (default), fill, native</td></tr>
+<tr><td><code>title:NAME</code></td><td>Set pane display title</td></tr>
+<tr><td><code>t:</code></td><td>Toggle timestamp prefix on subsequent lines</td></tr>
+<tr><td><code>c:</code></td><td>Clear pane scrollback</td></tr>
+<tr><td><code>q:</code></td><td>Stop the server</td></tr>
+</table>
+<hr>
+<h2>REST API</h2>
+<p>Base: <code>http://HOST:PORT/api/v1</code></p>
+<p>All authenticated endpoints require <code>Authorization: Bearer TOKEN</code>. The admin endpoint additionally requires a loopback source address. Rate limit: 10 req/min on unauthenticated endpoints.</p>
+<h3>Health</h3>
+<pre><code>GET /api/v1/ping             → 200 OK
+GET /api/v1/session          → {windows, active_window}   [authed]
+GET /api/v1/admin/connections → {connections:[...]}        [admin+authed]
+GET /api/v1/bindings         → {actions:{key:action,...}}  [unauthed]
+GET /api/v1/formatters       → {formatters:[...]}          [unauthed]
+</code></pre>
+<h3>WebSocket</h3>
+<pre><code>GET /api/v1/ws               Upgrade to WebSocket, sub-protocol rdw-v1
+</code></pre>
+<p>Query: <code>?token=TOKEN</code> or <code>Authorization: Bearer TOKEN</code> header.</p>
+<h3>Stream ingest</h3>
+<pre><code>POST /api/v1/stream/{id}     body: {line:STRING}  [authed]
+</code></pre>
+<p>HTTP alternative to Unix socket / <code>rdw pipe</code>.</p>
+<h3>Windows</h3>
+<pre><code>GET    /api/v1/windows                → {windows:[...]}
+POST   /api/v1/windows                body:{name}       → 204
+DELETE /api/v1/windows/{name}                           → 204
+PATCH  /api/v1/windows/{name}         body:{name}       → 204  (rename)
+POST   /api/v1/windows/{name}/focus                     → 204
+</code></pre>
+<h3>Panes</h3>
+<pre><code>POST   /api/v1/panes/{id}/split       body:{dir:&#34;h&#34;|&#34;v&#34;} → 204
+POST   /api/v1/panes/{id}/zoom                           → 204
+POST   /api/v1/panes/{id}/resize      body:{size}        → 204
+POST   /api/v1/panes/{id}/swap        body:{target}      → 204
+DELETE /api/v1/panes/{id}                                → 204
+PATCH  /api/v1/panes/{id}             body:{title}       → 204  (set display title; &#34;label&#34; also accepted)
+POST   /api/v1/panes/{id}/format      body:{formatter}   → {html}
+POST   /api/v1/panes/{id}/terminal    body:{cmd}         → {port,url}
+DELETE /api/v1/panes/{id}/terminal                       → 204
+</code></pre>
+<h3>Bookmarks</h3>
+<pre><code>GET    /api/v1/panes/{id}/bookmarks                     → {bookmarks:[...]}
+PUT    /api/v1/panes/{id}/bookmarks/{name}  body:{line_index} → 204
+DELETE /api/v1/panes/{id}/bookmarks/{name}              → 204
+</code></pre>
+<h3>KV store</h3>
+<pre><code>GET    /api/v1/kv              ?prefix=PREFIX   → {keys:[...]}
+GET    /api/v1/kv/{key}                         → {key,value}
+PUT    /api/v1/kv/{key}        body:{value}     → 204
+DELETE /api/v1/kv/{key}                         → 204
+</code></pre>
+<h3>Layouts</h3>
+<pre><code>GET  /api/v1/layouts                    → {layouts:[...]}
+POST /api/v1/layouts                    body:{name} → 204  (save current)
+POST /api/v1/layouts/{name}/apply               → 204
+</code></pre>
+<h3>Tokens</h3>
+<pre><code>GET    /api/v1/tokens                   → {tokens:[...]}
+POST   /api/v1/tokens     body:{scope?,expires?} → {id,plain_text}
+DELETE /api/v1/tokens/{id}              → 204
+</code></pre>
+<h3>Groups</h3>
+<pre><code>POST /api/v1/groups/{name}/hide
+POST /api/v1/groups/{name}/show
+POST /api/v1/groups/{name}/focus
+POST /api/v1/groups/{name}/kill
+</code></pre>
+<p>All return 204.</p>
+<h3>Highlights</h3>
+<pre><code>GET    /api/v1/highlights               → {profiles:[...]}
+PUT    /api/v1/highlights/{name}        body:{rules:[{pattern,class},...]} → 204
+DELETE /api/v1/highlights/{name}        → 204
+</code></pre>
+<h3>Export</h3>
+<pre><code>POST /api/v1/export/pane    body:{id, out_dir}         → 204
+POST /api/v1/export/window  body:{name, out_dir}        → 204
+POST /api/v1/export/all     body:{out_dir}              → 204
+</code></pre>
+<h3>Cycle</h3>
+<pre><code>POST /api/v1/cycle/start  body:{windows:[...], interval_ms:N} → {windows,interval_ms}
+POST /api/v1/cycle/stop                                        → 204
+</code></pre>
+<hr>
+<h2>Layout YAML schema</h2>
+<pre><code class="language-yaml">schema_version: 1
+windows:
+  - name: STRING          # window name, unique
+    panes:
+      - target_id: STRING  # TargetID pattern [a-zA-Z0-9_][a-zA-Z0-9_ -]* max 64
+        split: h|v         # split direction relative to previous pane
+        size: STRING       # N (cols/rows), Npx, or N%
+        group: STRING      # optional group name
+        private: BOOL      # hide from shared views
+        scrollback_cap: N  # override global default
+</code></pre>
+<hr>
+<h2>Config file (<code>~/.config/rdw/config.yaml</code>)</h2>
+<pre><code class="language-yaml">server:
+  port: 7681
+  filter_chain_max: 8
+  scrollback_cap: 10000
+
+auth:
+  no_auth: false
+  admin_local_only: true
+
+kv:
+  persist_path: &#34;&#34;     # empty = memory only
+</code></pre>
+<hr>
+<h2>WebSocket message types (server → browser)</h2>
+<table>
+<tr><th>type</th><th>fields</th><th>meaning</th></tr>
+<tr><td><code>line</code></td><td><code>target_id</code>, <code>line</code></td><td>new output line for a pane</td></tr>
+<tr><td><code>layout_update</code></td><td><code>windows</code>, <code>active</code></td><td>layout changed</td></tr>
+<tr><td><code>RECONNECT</code></td><td>—</td><td>client should flush reconnect queue</td></tr>
+<tr><td><code>highlight_set</code></td><td><code>target_id</code>, <code>profile</code></td><td>apply highlight profile</td></tr>
+<tr><td><code>scrollback_ctl</code></td><td><code>target_id</code>, <code>action</code></td><td>clear/top/bottom</td></tr>
+</table>
+<hr>
+<h2>TargetID rules</h2>
+<ul><li>Pattern: <code>[a-zA-Z0-9_][a-zA-Z0-9_ -]*</code></li>
+<li>Max length: 64 characters</li>
+<li>No leading space or hyphen</li>
+<li>Same rules apply to KV keys and layout pane identifiers</li>
+</ul>
+<hr>
+<h2>Token format</h2>
+<p>Tokens are returned as plain text once. They are stored SHA-256 hashed on the server. Expiry is a Go duration string: <code>1h</code>, <code>24h</code>, <code>7d</code>. Zero means no expiry.</p>
+<hr>
+<h2>Keyboard bindings (browser defaults)</h2>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><code>h</code> / <code>l</code></td><td>focus left / right pane</td></tr>
+<tr><td><code>j</code> / <code>k</code></td><td>focus down / up pane</td></tr>
+<tr><td><code>H</code> / <code>L</code></td><td>resize pane left / right</td></tr>
+<tr><td><code>J</code> / <code>K</code></td><td>resize pane down / up</td></tr>
+<tr><td><code>g t</code></td><td>next window</td></tr>
+<tr><td><code>g T</code></td><td>previous window</td></tr>
+<tr><td><code>g g</code></td><td>first window</td></tr>
+<tr><td><code>G</code></td><td>last window</td></tr>
+<tr><td><code>z</code></td><td>toggle zoom</td></tr>
+<tr><td><code>s</code></td><td>split horizontal</td></tr>
+<tr><td><code>v</code></td><td>split vertical</td></tr>
+<tr><td><code>x</code></td><td>close pane</td></tr>
+<tr><td><code>r</code></td><td>rename pane</td></tr>
+<tr><td><code>S</code></td><td>enter swap mode</td></tr>
+<tr><td><code>/</code></td><td>open search</td></tr>
+<tr><td><code>n</code> / <code>N</code></td><td>next / previous search match</td></tr>
+<tr><td><code>Escape</code></td><td>exit mode</td></tr>
+<tr><td><code>?</code></td><td>show binding help</td></tr>
+</table>
+<p>All bindings are configurable in <code>~/.config/rdw/config.yaml</code> under a <code>bindings:</code> key mapping action names to key strings.</p>
+<hr>
+<h2>rdw status</h2>
+<pre><code>rdw status [--json]
+rdw status pane &lt;id&gt; [--json]
+</code></pre>
+<p>Shows a full server introspection snapshot: port, active connections, KV entry count, panes (title, formatter, scrollback length, bookmark count), saved layouts, registered formatters, highlight profiles, active tokens, and focus cycle state.</p>
+<p><code>rdw status pane ID</code> shows per-pane detail: title, formatter, saved formatter, scrollback length and cap, last line received, and all bookmarks.</p>
+<hr>
+<h2>User-defined formatters</h2>
+<p>A user formatter is an external shell command. It receives the pane scrollback on stdin (one line per line) and must write HTML to stdout. Output is wrapped in a sandboxed iframe so inline scripts cannot reach the rdw SPA.</p>
+<p>The current KV snapshot is injected into the subprocess environment with original key names and values. The subprocess is read-only with respect to KV.</p>
+<p>Register in config:</p>
+<pre><code class="language-yaml">formatters:
+  - name: myformat
+    cmd: /usr/local/bin/myformat.sh
+</code></pre>
+<p>Register at runtime:</p>
+<pre><code>rdw formatter register myformat &#34;/usr/local/bin/myformat.sh&#34;
+rdw formatter list
+rdw formatter unregister myformat
+</code></pre>
+<p>Via API:</p>
+<pre><code>POST   /api/v1/formatters          body:{name, cmd}  → 204
+DELETE /api/v1/formatters/{name}                     → 204
+</code></pre>
+<p>Built-in formatter names (text, json, yaml, markdown, csv, image) cannot be overridden.</p>
+<hr>
+<h2>Admin web page</h2>
+<p>Available at <code>http://localhost:PORT/admin</code>. Requires a separate admin token distinct from regular session tokens.</p>
+<p>Set via config:</p>
+<pre><code class="language-yaml">auth:
+  admin_token: mysecrettoken
+</code></pre>
+<p>Or via flag:</p>
+<pre><code>rdw server start --admin-token mysecrettoken
+</code></pre>
+<p>Access:</p>
+<pre><code>http://localhost:7681/admin?token=mysecrettoken
+</code></pre>
+<p>Or with header: <code>Authorization: Bearer mysecrettoken</code></p>
+<p>The page auto-refreshes every 10 seconds and shows: server port, active WebSocket connections, KV entry count, pane table (title/formatter/scrollback/bookmarks), formatters, highlight profiles, saved layouts, active tokens, and focus cycle state.</p>
+<hr>
+<h2>KV and filters</h2>
+<p>The current KV snapshot is injected into filter subprocess environments using original key names and values. The subprocess is read-only with respect to KV — it cannot write back.</p>
+<p>KV injection is dynamic: each line spawns a fresh subprocess with the current snapshot so filters always see up-to-date values.</p>
+<p>Example filter that uses a KV value:</p>
+<pre><code class="language-sh">#!/bin/sh
+# $threshold is set via: rdw kv set threshold 100
+while IFS= read -r line; do
+  echo &#34;[$threshold] $line&#34;
+done
+</code></pre>
+<p>Register: <code>rdw pipe --id log --filter ./annotate.sh</code></p>
+
+<div id="nav-bar"><a href="../guide/ci.html">← CI and Headless Use</a><a href="control.html">Control Sequences →</a></div>
+</main>
+</body>
+</html>

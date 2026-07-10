@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REST API — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="cli.html">CLI Commands</a></li><li><a href="control.html">Control Sequences</a></li><li><a href="api.html" class="active">REST API</a></li><li><a href="websocket.html">WebSocket Protocol</a></li><li><a href="layout.html">Layout Schema</a></li><li><a href="config.html">Configuration</a></li><li><a href="bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="../dev/architecture.html">Architecture</a></li><li><a href="../dev/onboarding.html">Onboarding</a></li><li><a href="../dev/code-review.html">Code Review</a></li><li><a href="../dev/improvements.html">Improvements</a></li><li><a href="../dev/worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>REST API Reference</h1>
+<p>Base URL: <code>http://HOST:PORT/api/v1</code></p>
+<p>All authenticated endpoints require <code>Authorization: Bearer TOKEN</code>. Rate limit: 10 req/min on unauthenticated endpoints.</p>
+<h2>Health</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Auth</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/ping</code></td><td>none</td><td>200 OK</td></tr>
+<tr><td>GET</td><td><code>/api/v1/session</code></td><td>token</td><td><code>{windows, active_window}</code></td></tr>
+<tr><td>GET</td><td><code>/api/v1/status</code></td><td>token</td><td>full snapshot</td></tr>
+<tr><td>GET</td><td><code>/api/v1/status/panes/{id}</code></td><td>token</td><td>per-pane detail</td></tr>
+<tr><td>GET</td><td><code>/api/v1/admin/connections</code></td><td>admin+token</td><td><code>{connections:[...]}</code></td></tr>
+<tr><td>GET</td><td><code>/api/v1/bindings</code></td><td>none</td><td><code>{actions:{key:action}}</code></td></tr>
+<tr><td>GET</td><td><code>/api/v1/formatters</code></td><td>none</td><td><code>{formatters:[...]}</code></td></tr>
+</table>
+<h2>WebSocket</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Notes</th></tr>
+<tr><td>GET</td><td><code>/api/v1/ws</code></td><td>Upgrade; sub-protocol <code>rdw-v1</code>; <code>?token=</code> or header</td></tr>
+</table>
+<h2>Stream ingest</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>POST</td><td><code>/api/v1/stream/{id}</code></td><td><code>{line}</code></td><td>204</td></tr>
+</table>
+<h2>Windows</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/windows</code></td><td>—</td><td><code>{windows:[...]}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/windows</code></td><td><code>{name}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/windows/{name}</code></td><td>—</td><td>204</td></tr>
+<tr><td>PATCH</td><td><code>/api/v1/windows/{name}</code></td><td><code>{name}</code></td><td>204 (rename)</td></tr>
+<tr><td>POST</td><td><code>/api/v1/windows/{name}/focus</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Panes</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/split</code></td><td>`{dir:&#34;h&#34;\</td><td>&#34;v&#34;}`</td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/zoom</code></td><td>—</td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/resize</code></td><td><code>{size}</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/swap</code></td><td><code>{target}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/panes/{id}</code></td><td>—</td><td>204</td></tr>
+<tr><td>PATCH</td><td><code>/api/v1/panes/{id}</code></td><td><code>{title}</code></td><td>204 (set title)</td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/format</code></td><td><code>{formatter}</code></td><td><code>{html}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/filters</code></td><td><code>{cmd}</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/panes/{id}/terminal</code></td><td><code>{cmd}</code></td><td><code>{port,url}</code></td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/panes/{id}/terminal</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Bookmarks</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/panes/{id}/bookmarks</code></td><td>—</td><td><code>{bookmarks:[...]}</code></td></tr>
+<tr><td>PUT</td><td><code>/api/v1/panes/{id}/bookmarks/{name}</code></td><td><code>{line_index}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/panes/{id}/bookmarks/{name}</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>KV store</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Query / Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/kv</code></td><td><code>?prefix=PREFIX</code></td><td><code>{keys:[...]}</code></td></tr>
+<tr><td>GET</td><td><code>/api/v1/kv/{key}</code></td><td>—</td><td><code>{key,value}</code></td></tr>
+<tr><td>PUT</td><td><code>/api/v1/kv/{key}</code></td><td><code>{value}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/kv/{key}</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Formatters</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/formatters</code></td><td>—</td><td><code>{formatters:[...]}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/formatters</code></td><td><code>{name,cmd}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/formatters/{name}</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Highlights</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/highlights</code></td><td>—</td><td><code>{profiles:[...]}</code></td></tr>
+<tr><td>PUT</td><td><code>/api/v1/highlights/{name}</code></td><td><code>{rules:[{pattern,class}]}</code></td><td>204</td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/highlights/{name}</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Layouts</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/layouts</code></td><td>—</td><td><code>{layouts:[...]}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/layouts</code></td><td><code>{name}</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/layouts/{name}/apply</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Tokens</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>GET</td><td><code>/api/v1/tokens</code></td><td>—</td><td><code>{tokens:[...]}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/tokens</code></td><td><code>{scope?,expires?}</code></td><td><code>{id,plain_text}</code></td></tr>
+<tr><td>DELETE</td><td><code>/api/v1/tokens/{id}</code></td><td>—</td><td>204</td></tr>
+</table>
+<h2>Groups</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Response</th></tr>
+<tr><td>POST</td><td><code>/api/v1/groups/{name}/hide</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/groups/{name}/show</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/groups/{name}/focus</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/groups/{name}/kill</code></td><td>204</td></tr>
+</table>
+<h2>Export</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>POST</td><td><code>/api/v1/export/pane</code></td><td><code>{id,out_dir}</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/export/window</code></td><td><code>{name,out_dir}</code></td><td>204</td></tr>
+<tr><td>POST</td><td><code>/api/v1/export/all</code></td><td><code>{out_dir}</code></td><td>204</td></tr>
+</table>
+<h2>Cycle</h2>
+<table>
+<tr><th>Method</th><th>Path</th><th>Body</th><th>Response</th></tr>
+<tr><td>POST</td><td><code>/api/v1/cycle/start</code></td><td><code>{windows:[...],interval_ms}</code></td><td><code>{windows,interval_ms}</code></td></tr>
+<tr><td>POST</td><td><code>/api/v1/cycle/stop</code></td><td>—</td><td>204</td></tr>
+<tr><td>GET</td><td><code>/api/v1/cycle/status</code></td><td>—</td><td><code>{running,windows,interval_ms}</code></td></tr>
+</table>
+
+<div id="nav-bar"><a href="control.html">← Control Sequences</a><a href="websocket.html">WebSocket Protocol →</a></div>
+</main>
+</body>
+</html>

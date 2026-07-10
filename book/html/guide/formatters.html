@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Formatters — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="installation.html">Installation</a></li><li><a href="quickstart.html">Quick Start</a></li><li><a href="concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="pipe.html">Piping Output</a></li><li><a href="titles.html">Pane Titles</a></li><li><a href="layouts.html">Layouts</a></li><li><a href="kv.html">Key-Value Store</a></li><li><a href="filters.html">Filters</a></li><li><a href="formatters.html" class="active">Formatters</a></li><li><a href="user-formatters.html">User-Defined Formatters</a></li><li><a href="images.html">Images and SVG</a></li><li><a href="send.html">Sending Files</a></li><li><a href="control.html">Control Sequences</a></li><li><a href="highlights.html">Highlight Profiles</a></li><li><a href="bookmarks.html">Bookmarks</a></li><li><a href="auth.html">Authentication</a></li><li><a href="mirror.html">Stream Mirroring</a></li><li><a href="cycle.html">Focus Cycle</a></li><li><a href="status.html">Introspection</a></li><li><a href="admin.html">Admin Page</a></li><li><a href="export.html">Export</a></li><li><a href="multi-server.html">Multiple Servers</a></li><li><a href="terminal.html">Terminal Panes</a></li><li><a href="bash-rd.html">bash-rd Compatibility</a></li><li><a href="ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="../dev/architecture.html">Architecture</a></li><li><a href="../dev/onboarding.html">Onboarding</a></li><li><a href="../dev/code-review.html">Code Review</a></li><li><a href="../dev/improvements.html">Improvements</a></li><li><a href="../dev/worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>Built-in Formatters</h1>
+<p>Formatters transform the pane scrollback into HTML for browser display. They run on demand and do not affect the stored data.</p>
+<h2>Available formatters</h2>
+<table>
+<tr><th>Name</th><th>Description</th></tr>
+<tr><td><code>text</code></td><td>Default; ANSI colour passthrough, HTML-escaped</td></tr>
+<tr><td><code>json</code></td><td>Syntax-highlighted, pretty-printed JSON (one object per line)</td></tr>
+<tr><td><code>yaml</code></td><td>Multi-document YAML with key/value colouring</td></tr>
+<tr><td><code>markdown</code></td><td>Rendered HTML: headings, bold, lists, code fences, links</td></tr>
+<tr><td><code>csv</code></td><td>Sortable HTML table; header row auto-detected; TSV supported</td></tr>
+<tr><td><code>image</code></td><td>base64-decoded PNG/JPEG/GIF/SVG/WebP as <code>&lt;img&gt;</code> element</td></tr>
+</table>
+<h2>Switching formatter</h2>
+<p><strong>Inline from the stream:</strong></p>
+<pre><code class="language-sh">echo &#34;f:json&#34; | rdw pipe --id api
+curl -s https://api.example.com/status | rdw pipe --id api
+</code></pre>
+<p><strong>Via the CLI:</strong></p>
+<pre><code class="language-sh">rdw formatter list
+</code></pre>
+<p><strong>Via the API:</strong></p>
+<pre><code class="language-sh">curl -X POST http://localhost:7681/api/v1/panes/api/format \
+  -H &#34;Authorization: Bearer $TOKEN&#34; \
+  -d &#39;{&#34;formatter&#34;:&#34;json&#34;}&#39;
+</code></pre>
+<p>Returns <code>{&#34;html&#34;:&#34;...&#34;}</code> — the rendered HTML string.</p>
+<h2>CSV sort</h2>
+<p>Click any column header in the browser to sort ascending; click again for descending. Numeric columns are detected automatically.</p>
+<h2>Formatter save/restore</h2>
+<p>When <code>image:</code> or <code>svg:</code> sentinel blocks are processed, the active formatter is saved, switched to image or svg for the display, then restored. This is automatic — the producer does not need to manage formatter state.</p>
+<h2>User-defined formatters</h2>
+<p>See <a href="user-formatters.md">User-Defined Formatters</a> for adding your own.</p>
+
+<div id="nav-bar"><a href="filters.html">← Filters</a><a href="user-formatters.html">User-Defined Formatters →</a></div>
+</main>
+</body>
+</html>

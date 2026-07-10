@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html" class="active">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw architecture</h1>
+<h2>Overview</h2>
+<p>rdw is a single-binary daemon. It has three operational roles that may run in the same process or in separate processes:</p>
+<ul><li>server — the persistent HTTP/WebSocket daemon</li>
+<li>client — any process that pipes output via <code>rdw pipe</code></li>
+<li>browser — the embedded SPA that renders panes</li>
+</ul>
+<pre><code>process stdout
+      |
+      v
+  rdw pipe  ──── Unix socket ────┐
+                                  │
+                           ┌──────┴──────┐
+                           │   Server    │
+                           │             │
+                    Router │  Session    │  KV Store
+                    ┌──────┤  Manager   ├──────────┐
+                    │      │             │          │
+                 Pipeline  │  Hub        │        SQLite
+                    │      └──────┬──────┘        (opt)
+                    │             │
+                    └────&gt; WebSocket broadcast
+                                  │
+                           Browser SPA
+</code></pre>
+<h2>Data flow</h2>
+<ol><li>The source process writes to stdout. The shell pipe connects that to <code>rdw pipe</code>&#39;s stdin.</li>
+<li><code>rdw pipe</code> opens a Unix socket to the server (falls back to HTTP). It sends one JSON frame per line.</li>
+<li>The server&#39;s <code>Router</code> receives each line. It looks up the <code>Pipeline</code> registered for that <code>TargetID</code>.</li>
+<li>The <code>Pipeline</code> applies the filter chain, dispatches inline control sequences, appends to the <code>ScrollbackBuffer</code>, and calls every registered sink.</li>
+<li>The broadcast sink serialises a <code>{type:&#34;line&#34;, target_id:&#34;...&#34;, line:&#34;...&#34;}</code> JSON frame and sends it to the WebSocket <code>Hub</code>.</li>
+<li>The <code>Hub</code> fans the frame out to every connected browser.</li>
+<li>The browser SPA appends the line to the appropriate pane&#39;s DOM ring buffer.</li>
+</ol>
+<h2>Key packages</h2>
+<h3>internal/session</h3>
+<p><code>TargetID</code> is a validated identifier <code>[a-zA-Z0-9_][a-zA-Z0-9_ -]*</code> (max 64 chars).</p>
+<p><code>ScrollbackBuffer</code> is a fixed-capacity circular ring backed by a slice. It is the source of truth for export and formatter operations.</p>
+<p><code>Manager</code> owns the ordered window list, the active window index, and the KV store reference. All mutations are guarded by a single <code>sync.RWMutex</code>. Windows hold slices of <code>*PaneState</code>; panes are never shared between windows.</p>
+<p><code>BookmarkStore</code> is a per-pane named-position store, held in the Router alongside the pipeline.</p>
+<h3>internal/router</h3>
+<p><code>Router</code> maps <code>TargetID → *pipeline.Pipeline</code> and <code>TargetID → *BookmarkStore</code>. It holds a single <code>PipelineSink</code> function (the WebSocket broadcast) and passes it to every pipeline it creates.</p>
+<p><code>SetControlHandler</code> registers a callback that the pipeline calls for every recognised control sequence that is not KV or verbatim. The server uses this to dispatch <code>bm:</code>, <code>hl:</code>, and <code>sc:</code> sequences.</p>
+<h3>internal/pipeline</h3>
+<p><code>Pipeline</code> is the per-pane processing unit. It is goroutine-safe. Processing order for each line:</p>
+<ol><li><code>control.Parse</code> — check for a control sequence prefix</li>
+<li>If verbatim (<code>v:</code>): strip prefix, continue as content</li>
+<li>If <code>b64:</code>: preserve prefix, continue as content (browser decodes)</li>
+<li>If KV (<code>=:</code>): write to KV store, stop</li>
+<li>Else: call the control handler and stop</li>
+<li>Apply filter chain (max 8 external transformers)</li>
+<li>Optionally prepend RFC-3339 timestamp (<code>t:</code> toggle)</li>
+<li><code>maybeDecodeBase64</code> — decode <code>b64:</code> prefix to raw bytes for export</li>
+<li>Append to <code>ScrollbackBuffer</code></li>
+<li>Call all sinks</li>
+</ol>
+<h3>internal/server</h3>
+<p><code>Server</code> aggregates all subsystems. It is constructed by <code>New()</code> and started by <code>Run(ctx)</code>. Shutdown is triggered by context cancellation or SIGINT/SIGTERM.</p>
+<p><code>Hub</code> is the WebSocket connection registry. It runs a single goroutine that serialises writes to avoid concurrent send races.</p>
+<p><code>routes()</code> registers all HTTP handlers on a fresh <code>http.ServeMux</code>. Middleware is composed via wrapper functions: <code>authed</code>, <code>unauth</code>, <code>admin</code>. The middleware stack is: loopback guard (admin only) → rate limiter (unauth only) → token auth (authed only) → handler.</p>
+<h3>internal/control</h3>
+<p>The parser checks multi-char prefixes (<code>b64:</code>, <code>bm:</code>, <code>hl:</code>, <code>sc:</code>) first, then single-char prefixes (<code>v:</code>, <code>q:</code>, <code>s:</code>, <code>c:</code>, <code>t:</code>, <code>f:</code>, <code>r:</code>, <code>=:</code>).</p>
+<h3>internal/kvstore</h3>
+<p>The in-memory store is a <code>map[Key]string</code> guarded by a <code>sync.RWMutex</code>. Keys follow the same character rules as TargetID and support a <code>prefix:</code> namespace convention (<code>window:name:key</code> or <code>pane:id:key</code>).</p>
+<p>When <code>--kv-persist</code> is set, each <code>Set</code> and <code>Delete</code> also writes to SQLite via <code>kvstore.DB</code>. On <code>--restore</code>, <code>DB.Load</code> populates the in-memory store before the server begins accepting connections.</p>
+<h3>internal/format</h3>
+<p>Six formatters implement <code>Formatter.Format([]string) (string, error)</code>. They produce HTML strings consumed by <code>POST /api/v1/panes/{id}/format</code>. The browser may also trigger formatting via the right-click context menu.</p>
+<h3>internal/pipe</h3>
+<p><code>Relay</code> reads lines from an <code>io.Reader</code>, sends each to the server as a JSON frame, and maintains a reconnect queue (default 1000 lines). On reconnect the queue is flushed in order; overflow drops the oldest entry silently. The <code>RECONNECT</code> marker frame sent by the server on WebSocket reconnect causes the browser to request a catch-up scrollback replay.</p>
+<h2>Authentication</h2>
+<p>Every request to authenticated endpoints must carry <code>Authorization: Bearer &lt;token&gt;</code>. Tokens are stored SHA-256 hashed; the plain-text value is returned once at creation. Token scope, expiry, and per-pane restrictions are enforced in <code>internal/auth</code>.</p>
+<p>The Unix socket at <code>$XDG_RUNTIME_DIR/rdw/&lt;session-id&gt;.sock</code> (mode 0600) accepts unauthenticated connections from the owning user. <code>rdw pipe</code> prefers this path.</p>
+<h2>WebSocket protocol</h2>
+<p>Sub-protocol: <code>rdw-v1</code>. Frame format: newline-delimited JSON objects.</p>
+<p>Server-to-browser message types:</p>
+<table>
+<tr><th>type</th><th>payload fields</th><th>trigger</th></tr>
+<tr><td><code>line</code></td><td><code>target_id</code>, <code>line</code></td><td>new output line</td></tr>
+<tr><td><code>layout_update</code></td><td><code>windows</code>, <code>active</code></td><td>any layout change</td></tr>
+<tr><td><code>RECONNECT</code></td><td>—</td><td>client reconnect</td></tr>
+<tr><td><code>highlight_set</code></td><td><code>target_id</code>, <code>profile</code></td><td><code>hl:</code> control sequence</td></tr>
+<tr><td><code>scrollback_ctl</code></td><td><code>target_id</code>, <code>action</code></td><td><code>sc:</code> control sequence</td></tr>
+</table>
+<h2>Port and discovery</h2>
+<p>The default port is 7681. Every CLI command accepts <code>--port / -p</code>. When <code>--port 0</code> is given, <code>discovery.Resolve(0)</code> probes the registry at <code>$XDG_CACHE_HOME/rdw/servers.json</code> and falls back to the default port. <code>PruneStale</code> removes entries whose server process is no longer alive.</p>
+<h2>Concurrency model</h2>
+<ul><li>One goroutine per WebSocket connection (read pump + write pump)</li>
+<li>One goroutine per active <code>Pipeline</code> (line processing loop)</li>
+<li>Hub runs one goroutine (fan-out loop)</li>
+<li>Discovery registry is file-locked; the in-process registry is mutex-guarded</li>
+<li>Session Manager: single <code>sync.RWMutex</code> over the window slice</li>
+<li>Router: single <code>sync.RWMutex</code> over the pipeline and bookmark maps</li>
+</ul>
+
+<div id="nav-bar"><a href="../reference/bindings.html">← Keyboard Bindings</a><a href="onboarding.html">Onboarding →</a></div>
+</main>
+</body>
+</html>
