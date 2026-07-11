@@ -49,4 +49,5 @@
 - [Onboarding](dev/onboarding.md)
 - [Code Review](dev/code-review.md)
 - [Improvements](dev/improvements.md)
+- [Unix Philosophy Analysis](dev/unix-analysis.md)
 - [Worklog](dev/worklog.md)

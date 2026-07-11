@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unix Philosophy Analysis — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="unix-analysis.html" class="active">Unix Philosophy Analysis</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw — Unix philosophy analysis and bash-rd intent</h1>
+<h2>What bash-rd wanted to achieve</h2>
+<p>bash-rd is a <strong>debugging and introspection tool</strong>. Its README opens with a real-world use case: a developer had a bug in <code>tdiff</code>, a complex interactive program, and needed to observe internal state without breaking the interactivity. The tool that emerged from that need has a specific, narrow purpose:</p>
+<ul><li>Send data from a running process to another terminal, a web page, or a remote machine</li>
+<li>Let a <strong>formatter</strong> — a shell script — decide what that data means and how to display it</li>
+<li>Use a <strong>KV store</strong> as the communication channel between the producer and the formatter</li>
+<li>Stay out of the way otherwise</li>
+</ul>
+<p>The core model: <code>program | rd -c ID</code> where <code>rd -c ID</code> reads from the program and a formatter running in a different process reads the KV store and decides what to render. The formatter is the user&#39;s code, not rd&#39;s. rd is a conduit.</p>
+<p>This is deeply Unix: small tool, composable, the user brings the intelligence.</p>
+<hr>
+<h2>Where rdw departs from Unix principles</h2>
+<h3>1. The formatter is in the wrong place</h3>
+<p>In bash-rd, the formatter runs <strong>alongside the server</strong> — it is sourced into the server process and has full access to the KV store, to <code>rd_line</code> (the current line), to bash&#39;s environment. It is the user&#39;s code running in the server context. The server is dumb; the formatter is smart.</p>
+<p>In rdw, built-in formatters (text, json, yaml, markdown, csv, image) run <strong>on demand in the server process</strong> against the stored scrollback. They produce HTML. The user cannot override them. User-defined formatters are external commands called once per format request — not once per line, not with access to the pipeline, not integrated into the processing chain.</p>
+<p>This inverts the bash-rd model. In bash-rd, <strong>you write the formatter</strong>. In rdw, <strong>the formatter is built in</strong> and you are a consumer of six fixed choices.</p>
+<p>The Unix fix: a formatter should be a filter in the pipeline — a command that reads lines and writes transformed lines or HTML, called per-line as data arrives, with the full KV store available. It should be no different from a filter. The distinction between filter (per-line, runs during ingestion) and formatter (on-demand, runs after storage) was introduced in rdw but does not exist in bash-rd.</p>
+<h3>2. KV is disconnected from the formatter pipeline</h3>
+<p>In bash-rd, KV is the <strong>primary communication mechanism between producer and formatter</strong>. The producer writes <code>=:x=1</code>, the server stores <code>x=1</code>, and the formatter reads <code>$x</code> directly from its bash environment. The formatter <em>reacts</em> to KV changes. This is how the <code>ptt</code> (pretty table) formatter works: you set variables, then ask the formatter to display them.</p>
+<p>In rdw, KV is injected into filter subprocesses and user-defined formatter subprocesses as environment variables — but only at invocation time. The built-in formatters (which handle most users&#39; needs) have no access to KV at all. A user cannot write <code>&#34;f:json&#34;</code> and have the formatter consult <code>$my_threshold</code> from the KV store. The formatter and the KV store are separate subsystems that do not communicate.</p>
+<p>The Unix fix: every formatter invocation — built-in or external — should receive the current KV snapshot. For built-in formatters this means passing KV as a parameter set. For external formatters it already works. The inconsistency is the problem.</p>
+<h3>3. <code>rdw pipe</code> is an active relay, not a passive pipe</h3>
+<p>In bash-rd, <code>rd -c ID</code> is essentially <code>cat</code> with a destination. The data flows through it unchanged; the formatter at the other end decides what to do.</p>
+<p>In rdw, <code>rdw pipe</code> is a complex relay with a reconnect queue, a hybrid binary reader, filter registration, title setting, layout application, and mirror forking. The client is doing work that should happen at the server or not happen at all.</p>
+<p>The Unix issue: a pipe should be a transparent conduit. The intelligence belongs at the server (for server-side concerns) or in the user&#39;s pipeline (for user-side concerns). <code>rdw pipe</code> mixing client-side mirroring with server-side layout application violates separation.</p>
+<p>A cleaner model: <code>rdw pipe</code> does one thing — send lines to the server. Mirroring is <code>tee</code>. Layout application is <code>rdw layout apply</code>. Title setting is <code>rdw pane rename</code>. The user composes these.</p>
+<h3>4. The control sequence namespace is growing into a protocol</h3>
+<p>bash-rd has 10 control sequences covering quit, verbatim, semaphore, clear, timestamp, when-to-run, clean-up, set-formatter, relay, and KV-write. Each is a single character. The protocol is minimal.</p>
+<p>rdw currently has 16 control sequence kinds including multi-char prefixes (<code>image:</code>, <code>svg:</code>, <code>svg-data:</code>, <code>scale:</code>, <code>title:</code>, <code>bm:</code>, <code>hl:</code>, <code>sc:</code>). The sentinel-framed binary blocks (<code>image:</code> / <code>image:end</code>) are effectively a framing protocol embedded in a line-oriented stream.</p>
+<p>This is the classic Unix anti-pattern: a tool that starts as a pipe and grows its own wire protocol. The binary/image problem is real, but the correct Unix answer is to not embed binary in a text stream at all — keep two separate channels, or use a well-known encoding (<code>base64 | rdw pipe</code>) rather than inventing a new sentinel framing scheme.</p>
+<p>The rdw <code>image:end</code> sentinel is particularly fragile: if the binary data contains a line that reads <code>image:end</code>, the framing breaks. A length-prefix would be safer, but the real answer is that binary transport is not a line-oriented pipe concern.</p>
+<h3>5. The server has too many responsibilities</h3>
+<p>rdw&#39;s <code>internal/server</code> package contains: HTTP server, WebSocket hub, Unix socket listener, REST API (50+ endpoints), browser SPA (~1200 lines of JS/HTML), session management, router, KV store access, highlight profile store, terminal pane launcher, focus cycle, admin page, formatter registry. This is not &#34;do one thing well.&#34;</p>
+<p>bash-rd&#39;s server does: receive lines, run the formatter, echo output. Three responsibilities.</p>
+<p>The Unix fix: each concern should be separable. The browser SPA could be a separate static file. The REST API and WebSocket server could be separate daemons. The terminal pane launcher is really <code>ttyd</code> — rdw wrapping it adds complexity without adding value beyond discoverability.</p>
+<h3>6. <code>rdw send</code> breaks the pipeline model</h3>
+<p><code>rdw send --id chart chart.png</code> reads a file and sends it to the server. This is convenient but wrong from a Unix perspective. The correct composition is:</p>
+<pre><code class="language-sh">cat chart.png | rdw pipe --id chart
+</code></pre>
+<p>or with explicit encoding:</p>
+<pre><code class="language-sh">base64 chart.png | rdw pipe --id chart
+</code></pre>
+<p><code>rdw send</code> is a convenience wrapper that hides the data flow. In Unix, you should be able to see what is happening in the pipeline. <code>rdw send</code> trades transparency for convenience.</p>
+<h3>7. Authentication and tokens are not composable</h3>
+<p>Unix tools authenticate via file permissions and process ownership. <code>rdw pipe</code> correctly uses a Unix socket with <code>0600</code> permissions for local use. But the REST API authentication (Bearer tokens) is a separate system that requires explicit token creation, management, and transmission. Tokens cannot be composed with standard Unix tools like <code>curl</code> without setup.</p>
+<p>bash-rd&#39;s security model: &#34;if you can reach the socket, you can send data.&#34; Simple, Unix-native. rdw&#39;s token system is appropriate for a networked service but adds friction for the primary use case (local development and debugging).</p>
+<h3>8. The browser SPA is embedded, not separate</h3>
+<p>Embedding the SPA in the binary guarantees it works offline, which is correct for a self-contained tool. But it makes the frontend unmodifiable without recompiling. A user who wants to customise the display — different colour scheme, different layout algorithm, additional pane widgets — cannot.</p>
+<p>bash-rd&#39;s formatter model solves this: <strong>you bring the HTML</strong>. The formatter writes arbitrary HTML; you own the display. rdw&#39;s embedded SPA means Anthropic owns the display.</p>
+<p>The Unix fix: serve the SPA from a configurable directory, fall back to the embedded default. Users who want customisation can provide their own HTML/JS.</p>
+<hr>
+<h2>What bash-rd got right that rdw should inherit more fully</h2>
+<p><strong>The formatter is the user&#39;s code.</strong> In bash-rd you write a shell function that has access to <code>$rd_line</code> and all KV variables. The formatter is sourced, not called. This means zero process overhead per line, full bash environment, and complete flexibility. rdw&#39;s external command formatter is correct in direction but wrong in granularity — it is called once per format request against the entire scrollback, not once per line during ingestion.</p>
+<p><strong>KV is the formatter&#39;s interface to the world.</strong> In bash-rd, KV is not a side feature — it is the primary way formatters receive configuration and context. <code>=:level=DEBUG</code> changes the formatter&#39;s behaviour on the next line. rdw implements this correctly in theory (KV injected into filter/formatter environments) but not in practice (built-in formatters ignore KV entirely).</p>
+<p><strong>Relays are composable.</strong> <code>rd -r ID</code> relays the server&#39;s output to another destination. This is just <code>tee</code> with an rd destination — the composition is explicit and visible. rdw&#39;s <code>--forward-to-cmd</code> and <code>--forward-to-file</code> are opaque options rather than explicit pipeline stages.</p>
+<p><strong>The server is tiny.</strong> bash-rd&#39;s server is a bash function. It receives lines, runs the formatter (if any), and echoes. There is no HTTP server, no WebSocket hub, no authentication, no REST API. For local debugging this is exactly right. rdw&#39;s complexity is justified for the network-remote and browser-display use cases, but it means rdw is no longer a debugging tool — it is an infrastructure component.</p>
+<hr>
+<h2>Summary table</h2>
+<table>
+<tr><th>Principle</th><th>bash-rd</th><th>rdw</th><th>Verdict</th></tr>
+<tr><td>Do one thing</td><td>receive lines, run formatter</td><td>receive, route, store, authenticate, format, display, export, introspect</td><td>rdw violates</td></tr>
+<tr><td>Composability</td><td>formatter is user code, relays are pipes</td><td>formatter is server code, mirroring is a flag</td><td>rdw partially violates</td></tr>
+<tr><td>Transparency</td><td>data flow is visible</td><td>rdw pipe hides buffering, encoding, layout application</td><td>rdw partially violates</td></tr>
+<tr><td>KV as formatter interface</td><td>KV is formatter&#39;s environment</td><td>KV reaches filters/user-formatters; built-ins ignore it</td><td>rdw partially violates</td></tr>
+<tr><td>Text streams</td><td>line-oriented, no binary framing</td><td>sentinel-framed binary protocol</td><td>rdw violates</td></tr>
+<tr><td>Small server</td><td>bash function</td><td>50+ endpoint REST daemon</td><td>rdw violates (justified for browser display)</td></tr>
+<tr><td>User owns the display</td><td>formatter writes arbitrary HTML</td><td>SPA is embedded and fixed</td><td>rdw violates</td></tr>
+<tr><td>Unix auth</td><td>socket permissions</td><td>token system over REST</td><td>rdw partially violates</td></tr>
+</table>
+<hr>
+<h2>Concrete recommendations</h2>
+<ol><li><strong>Make every formatter a pipeline filter.</strong> A formatter should be callable per-line during ingestion, not just on-demand against the scrollback. The distinction between filter and formatter should collapse: both are external commands in the pipeline. Format-on-demand becomes a special case of running the pipeline over stored lines.</li>
+</ol>
+<ol><li><strong>Give built-in formatters access to KV.</strong> When a built-in formatter runs, the current KV snapshot should be passed to it (as a parameter, not just to external subprocesses). A json formatter that can read <code>$kv_indent</code> to control pretty-printing behaves like bash-rd&#39;s formatters.</li>
+</ol>
+<ol><li><strong>Make <code>rdw pipe</code> dumb.</strong> Remove mirroring, title setting, layout application, and filter registration from <code>rdw pipe</code>. Those belong in <code>tee</code>, <code>rdw pane rename</code>, <code>rdw layout apply</code>, and <code>rdw formatter register</code> respectively. The user composes them in the shell.</li>
+</ol>
+<ol><li><strong>Serve the SPA from a configurable directory.</strong> The embedded SPA is the default; <code>--frontend /path/to/dir</code> serves a custom one. This restores the bash-rd principle that the user owns the display.</li>
+</ol>
+<ol><li><strong>Replace sentinel framing with standard encoding.</strong> <code>image:</code> / <code>image:end</code> should not exist. Binary data should arrive as <code>base64 | rdw pipe --id chart</code> with the pane formatter set to <code>image</code>. The encoding is handled by the standard <code>base64</code> tool, not by a custom framing protocol inside rdw.</li>
+</ol>
+
+<div id="nav-bar"><a href="improvements.html">← Improvements</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>
