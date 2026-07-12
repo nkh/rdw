@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unix Redesign Design — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="unix-analysis.html">Unix Philosophy Analysis</a></li><li><a href="unix-redesign.html" class="active">Unix Redesign Design</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw Unix redesign — detailed design</h1>
+<p>This document describes the precise architectural changes needed to implement the five recommendations from <code>docs/unix-analysis.md</code>. Each section covers the problem in depth, the target design, how the user interacts with it, how the code changes, and why it improves Unix alignment.</p>
+<hr>
+<h2>Recommendation 1 — Collapse filter and formatter into one pipeline stage</h2>
+<h3>The problem</h3>
+<p>rdw currently has two distinct, non-interchangeable processing stages:</p>
+<pre><code>stdin
+  │
+  ▼
+Filter (per-line, runs during ingestion, returns plain text)
+  │
+  ▼
+Scrollback buffer (stores plain text lines)
+  │
+  ▼ (on demand)
+Formatter (reads whole scrollback, returns HTML)
+  │
+  ▼
+Browser
+</code></pre>
+<p>A filter cannot produce HTML. A formatter cannot see individual lines as they arrive. A user who wants to syntax-highlight lines as they are ingested — not on demand — cannot do so. A user who wants a formatter that reacts to a threshold (e.g. &#34;if line count &gt; 100, summarise&#34;) cannot do so because the formatter does not have access to per-line context.</p>
+<p>In bash-rd there is no distinction. The &#34;formatter&#34; is sourced into the server and runs on each line. It has <code>$rd_line</code>, the full KV store, and can emit arbitrary output. It is a filter that happens to emit HTML.</p>
+<h3>Target design</h3>
+<p>Replace the two-stage model with a single <strong>stage</strong> concept:</p>
+<pre><code>stdin
+  │
+  ▼
+Stage 1: plain text filter (optional, per-line → per-line)
+Stage 2: plain text filter (optional, per-line → per-line)
+...
+Stage N: rendering stage (per-line → HTML fragment OR deferred batch → HTML)
+  │
+  ▼
+Scrollback buffer (stores the output of the last stage)
+  │
+  ▼
+Browser
+</code></pre>
+<p>A stage is any external command. The contract:</p>
+<ul><li>Receives one line on stdin per invocation (streaming mode) OR the full</li>
+</ul>
+<p>  scrollback on stdin (batch mode, for backward compat with current formatters)</p>
+<ul><li>Writes to stdout</li>
+<li>Has the current KV snapshot in its environment</li>
+<li>Marked as <code>--html</code> if its output should be sent to the browser as HTML</li>
+</ul>
+<p>  rather than stored as text</p>
+<p>This means:</p>
+<pre><code class="language-sh"># Today (two separate systems):
+my_app | rdw pipe --id log --filter &#39;grep ERROR&#39;
+# Then separately: echo &#34;f:json&#34; | rdw pipe --id log
+
+# Tomorrow (one system):
+my_app | rdw pipe --id log \
+  --stage &#39;grep ERROR&#39; \
+  --stage --html &#39;python3 colorize.py&#39;
+</code></pre>
+<p>The <code>--stage --html</code> flag tells the pipeline that subsequent lines produced by this stage are HTML fragments, not plain text. The browser renders them inline alongside plain text lines (in a <code>&lt;span class=&#34;rdw-html&#34;&gt;</code> wrapper).</p>
+<h3>User-facing interface</h3>
+<p><strong>Register a rendering stage at runtime:</strong></p>
+<pre><code class="language-sh">rdw pane stage add log --cmd &#39;python3 highlight.py&#39; --html
+rdw pane stage list log
+rdw pane stage remove log 0
+</code></pre>
+<p><strong>In config (applies to all panes):</strong></p>
+<pre><code class="language-yaml">stages:
+  - name: colorize
+    cmd: /usr/local/bin/colorize.sh
+    html: true
+</code></pre>
+<p><strong>Use case — live syntax highlighting as lines arrive:</strong></p>
+<pre><code class="language-sh"># highlight.py reads one line on stdin, writes one HTML span on stdout
+cat &gt; /tmp/highlight.py &lt;&lt; &#39;EOF&#39;
+import sys, html
+line = sys.stdin.readline().rstrip()
+cls = &#34;err&#34; if &#34;ERROR&#34; in line else &#34;warn&#34; if &#34;WARN&#34; in line else &#34;info&#34;
+print(f&#39;&lt;span class=&#34;hl-{cls}&#34;&gt;{html.escape(line)}&lt;/span&gt;&#39;)
+EOF
+
+my_app | rdw pipe --id log --stage --html &#39;python3 /tmp/highlight.py&#39;
+</code></pre>
+<p>Every incoming line immediately appears in the browser with colour applied, with no separate &#34;apply formatter&#34; step.</p>
+<p><strong>Use case — filter then highlight:</strong></p>
+<pre><code class="language-sh">my_app | rdw pipe --id log \
+  --stage &#39;grep -E &#34;ERROR|WARN&#34;&#39; \
+  --stage --html &#39;python3 /tmp/highlight.py&#39;
+</code></pre>
+<p>Stage 1 drops non-error lines. Stage 2 colours the survivors. Both are external commands. The user composes them.</p>
+<p><strong>Use case — batch rendering on demand (backward compat):</strong></p>
+<pre><code class="language-sh"># Old way still works — &#34;format on demand&#34; is batch mode
+rdw pane format log json
+</code></pre>
+<p>The <code>Formatter.Format([]string) (string, error)</code> interface is preserved for batch use. It is no longer the only way to affect display.</p>
+<h3>Architecture changes</h3>
+<h4><code>internal/pipeline</code></h4>
+<p>Add a <code>StageKind</code> enum:</p>
+<pre><code class="language-go">type StageKind int
+const (
+    StageText StageKind = iota // per-line, plain text output
+    StageHTML                  // per-line, HTML fragment output
+)
+
+type Stage struct {
+    Kind StageKind
+    Fn   func(line string) (string, bool)
+}
+</code></pre>
+<p><code>Pipeline.stages []Stage</code> replaces <code>Pipeline.filters []Filter</code>.</p>
+<p><code>processLine</code> applies stages in order. When a <code>StageHTML</code> stage produces output, it is wrapped in <code>&lt;span class=&#34;rdw-html&#34;&gt;</code> before going to the scrollback and sinks:</p>
+<pre><code class="language-go">func (p *Pipeline) processLine(raw string) error {
+    line := raw
+    for _, stage := range p.stages {
+        out, keep := stage.Fn(line)
+        if !keep {
+            return nil
+        }
+        if stage.Kind == StageHTML {
+            line = `&lt;span class=&#34;rdw-html&#34;&gt;` + out + `&lt;/span&gt;`
+        } else {
+            line = out
+        }
+    }
+    p.scrollback.Append(line)
+    for _, sink := range p.sinks {
+        sink(p.targetID, line)
+    }
+    return nil
+}
+</code></pre>
+<h4><code>internal/pipeline/cmdstage.go</code></h4>
+<p>Replace <code>cmdfilter.go</code> with <code>cmdstage.go</code>:</p>
+<pre><code class="language-go">type CmdStage struct {
+    kind   StageKind
+    cmdStr string
+    kv     *kvstore.Store
+}
+
+func NewCmdStage(cmdStr string, kind StageKind, kv *kvstore.Store) *CmdStage
+
+func (s *CmdStage) Stage() Stage {
+    return Stage{Kind: s.kind, Fn: s.process}
+}
+</code></pre>
+<p>The subprocess is restarted on each line with fresh KV (same as current CmdFilter behaviour).</p>
+<h4>Server API</h4>
+<pre><code>POST /api/v1/panes/{id}/stages   body:{cmd, html:bool}  → 204
+GET  /api/v1/panes/{id}/stages                          → {stages:[{cmd,html}]}
+DELETE /api/v1/panes/{id}/stages/{index}                → 204
+</code></pre>
+<h4>Migration</h4>
+<ul><li><code>--filter</code> on <code>rdw pipe</code> becomes <code>--stage</code> (with <code>--html</code> opt-in)</li>
+<li><code>--filter</code> is kept as a deprecated alias for <code>--stage</code></li>
+<li><code>POST /api/v1/panes/{id}/filters</code> maps to <code>POST /api/v1/panes/{id}/stages</code></li>
+</ul>
+<p>  with <code>html:false</code></p>
+<h3>Why this is more Unix</h3>
+<p>In Unix a filter does not need to know whether its output will be displayed as text or HTML. The display decision belongs at the output end of the pipeline, not at a separate &#34;format&#34; invocation. Every stage in the pipeline is a composable shell command. The distinction between &#34;filter&#34; (text) and &#34;formatter&#34; (HTML) is an implementation detail that leaked into the user interface.</p>
+<hr>
+<h2>Recommendation 2 — Give built-in formatters access to KV</h2>
+<h3>The problem</h3>
+<p>When <code>json</code> or <code>csv</code> or any built-in formatter runs, it has no access to the session KV store. A user cannot write:</p>
+<pre><code class="language-sh">rdw kv set json.indent 4
+rdw kv set csv.separator &#34;|&#34;
+</code></pre>
+<p>and have the formatters respect those values. In bash-rd, the formatter is a bash function that has <code>$rd_kv_json_indent</code> in its environment by default. KV is the formatter&#39;s configuration interface.</p>
+<h3>Target design</h3>
+<p><code>Formatter.Format</code> receives a second argument: the current KV snapshot.</p>
+<pre><code class="language-go">type Formatter interface {
+    Name() string
+    Format(lines []string, kv map[string]string) (string, error)
+}
+</code></pre>
+<p>Each built-in formatter reads well-known keys from <code>kv</code> with sensible defaults:</p>
+<table>
+<tr><th>Formatter</th><th>KV key</th><th>Effect</th><th>Default</th></tr>
+<tr><td><code>json</code></td><td><code>json.indent</code></td><td>spaces per indent level</td><td><code>2</code></td></tr>
+<tr><td><code>json</code></td><td><code>json.compact</code></td><td>disable pretty-print</td><td><code>false</code></td></tr>
+<tr><td><code>csv</code></td><td><code>csv.separator</code></td><td>column separator char</td><td><code>,</code></td></tr>
+<tr><td><code>csv</code></td><td><code>csv.header</code></td><td>treat first row as header</td><td><code>true</code></td></tr>
+<tr><td><code>markdown</code></td><td><code>markdown.theme</code></td><td><code>light</code> or <code>dark</code></td><td><code>dark</code></td></tr>
+<tr><td><code>text</code></td><td><code>text.wrap</code></td><td>column width for wrapping</td><td><code>0</code> (no wrap)</td></tr>
+<tr><td><code>image</code></td><td><code>image.scale</code></td><td><code>fit</code>, <code>fill</code>, <code>native</code></td><td><code>fit</code></td></tr>
+<tr><td><code>image</code></td><td><code>image.max_height</code></td><td>CSS max-height</td><td>`` (none)</td></tr>
+</table>
+<h3>User-facing interface</h3>
+<pre><code class="language-sh"># Make JSON output compact
+rdw kv set json.compact true
+rdw pane format log json
+
+# Pipe-separated CSV
+rdw kv set csv.separator &#34;|&#34;
+rdw pane format data csv
+
+# Apply while piping
+echo &#34;=:json.indent=4&#34; | rdw pipe --id api
+curl -s https://api.example.com/ | rdw pipe --id api
+</code></pre>
+<p><strong>Use case — dashboard with multiple formatters all reading shared config:</strong></p>
+<pre><code class="language-sh"># Set a global theme once
+rdw kv set markdown.theme light
+rdw kv set json.indent 2
+
+# All formatters in all panes now use these settings
+rdw pane format docs markdown
+rdw pane format api  json
+rdw pane format logs text
+</code></pre>
+<p>This is the bash-rd model: one <code>=:key=value</code> line affects all formatters in the session simultaneously.</p>
+<h3>Architecture changes</h3>
+<h4><code>internal/format/format.go</code></h4>
+<pre><code class="language-go">type Formatter interface {
+    Name() string
+    Format(lines []string, kv map[string]string) (string, error)
+}
+</code></pre>
+<p>Every built-in formatter reads from <code>kv</code>:</p>
+<pre><code class="language-go">// internal/format/json.go
+func (f *JSONFormatter) Format(lines []string, kv map[string]string) (string, error) {
+    indent := 2
+    if v, ok := kv[&#34;json.indent&#34;]; ok {
+        if n, err := strconv.Atoi(v); err == nil {
+            indent = n
+        }
+    }
+    compact := kv[&#34;json.compact&#34;] == &#34;true&#34;
+    // ... rest of formatter
+}
+</code></pre>
+<h4><code>internal/server/routes.go</code> — <code>handlePaneFormat</code></h4>
+<pre><code class="language-go">func (s *Server) handlePaneFormat(w http.ResponseWriter, r *http.Request) {
+    // ...
+    kvSnap := make(map[string]string)
+    for k, v := range s.kv.Snapshot() {
+        kvSnap[k.String()] = v
+    }
+    html, err := f.Format(lines, kvSnap)
+    // ...
+}
+</code></pre>
+<h4><code>internal/format/cmd.go</code> — <code>CmdFormatter</code></h4>
+<p><code>CmdFormatter.Format</code> already injects KV into the subprocess environment. The <code>kv map[string]string</code> parameter replaces the stored snapshot, making it dynamic:</p>
+<pre><code class="language-go">func (f *CmdFormatter) Format(lines []string, kv map[string]string) (string, error) {
+    cmd := exec.Command(&#34;sh&#34;, &#34;-c&#34;, f.cmdStr)
+    for k, v := range kv {
+        cmd.Env = append(cmd.Env, k+&#34;=&#34;+v)
+    }
+    // ...
+}
+</code></pre>
+<p>This makes built-in and external formatters behave identically with respect to KV — both receive the full current snapshot at invocation time.</p>
+<h3>Why this is more Unix</h3>
+<p>A Unix tool reads its configuration from its environment. In bash-rd, the formatter&#39;s environment <em>is</em> the KV store. Making rdw&#39;s built-in formatters KV-aware closes the gap. A user who learns to configure rdw via <code>rdw kv set</code> can configure every formatter — built-in or external — the same way.</p>
+<hr>
+<h2>Recommendation 3 — Make <code>rdw pipe</code> dumb</h2>
+<h3>The problem</h3>
+<p><code>rdw pipe</code> currently does:</p>
+<ul><li>Resolve the server via discovery</li>
+<li>Apply a layout (<code>--layout</code>)</li>
+<li>Set the pane title (<code>--title</code>)</li>
+<li>Register filter stages (<code>--filter</code>, <code>--stage</code>)</li>
+<li>Set up stream mirroring (<code>--forward-to-file</code>, <code>--forward-to-cmd</code>, <code>--forward</code>)</li>
+<li>Relay stdin to the server</li>
+</ul>
+<p>Items 2–5 are setup operations that have nothing to do with relaying a stream. They belong in the shell, composed before the pipe, not inside the pipe command.</p>
+<p>This violates Unix rule: a pipe is a transport. It should not have side effects on the system it is transporting to. A <code>curl | grep | sort</code> pipeline does not modify the remote server&#39;s configuration.</p>
+<h3>Target design</h3>
+<p><code>rdw pipe</code> does exactly one thing: relay stdin to a named pane.</p>
+<pre><code class="language-sh">rdw pipe --id log
+</code></pre>
+<p>The options that remain:</p>
+<ul><li><code>--id</code> (required)</li>
+<li><code>--port</code> (server selection)</li>
+</ul>
+<p>Everything else moves to its natural command:</p>
+<table>
+<tr><th>Removed from <code>rdw pipe</code></th><th>Correct Unix composition</th></tr>
+<tr><td><code>--layout NAME</code></td><td>`rdw layout apply NAME &amp;&amp; prog \</td><td>rdw pipe --id log`</td></tr>
+<tr><td><code>--title TEXT</code></td><td>`rdw pane rename log &#34;My Log&#34; &amp;&amp; prog \</td><td>rdw pipe --id log`</td></tr>
+<tr><td><code>--filter CMD</code></td><td>`rdw pane stage add log --cmd CMD &amp;&amp; prog \</td><td>rdw pipe --id log`</td></tr>
+<tr><td><code>--forward-to-file PATH</code></td><td>`prog \</td><td>tee PATH \</td><td>rdw pipe --id log`</td></tr>
+<tr><td><code>--forward-to-cmd CMD</code></td><td>`prog \</td><td>tee &gt;(CMD) \</td><td>rdw pipe --id log`</td></tr>
+<tr><td><code>--forward rd</code></td><td>`prog \</td><td>tee &gt;(rd -c compat) \</td><td>rdw pipe --id log`</td></tr>
+</table>
+<h3>User-facing interface</h3>
+<p><strong>Before (current rdw):</strong></p>
+<pre><code class="language-sh">make build 2&gt;&amp;1 | rdw pipe --id build \
+  --title &#34;CI Build&#34; \
+  --layout ci.yaml \
+  --filter &#39;grep -v DEBUG&#39; \
+  --forward-to-file /tmp/build.log
+</code></pre>
+<p><strong>After (Unix composition):</strong></p>
+<pre><code class="language-sh">rdw layout apply ci.yaml
+rdw pane rename build &#34;CI Build&#34;
+rdw pane stage add build --cmd &#39;grep -v DEBUG&#39;
+
+make build 2&gt;&amp;1 | tee /tmp/build.log | rdw pipe --id build
+</code></pre>
+<p>The second form is longer but every step is visible and independently reusable. The setup commands run once; the pipe runs every time.</p>
+<p><strong>Use case — reusable setup script:</strong></p>
+<pre><code class="language-sh">#!/bin/sh
+# setup-ci-panes.sh — run once before any build
+rdw layout apply ci.yaml
+rdw pane rename build &#34;CI Build&#34;
+rdw pane rename test  &#34;Test Suite&#34;
+rdw pane stage add build --cmd &#39;grep -v DEBUG&#39;
+rdw pane stage add test  --cmd &#39;grep -E &#34;PASS|FAIL|ERROR&#34;&#39;
+rdw kv set json.indent 2
+</code></pre>
+<pre><code class="language-sh">./setup-ci-panes.sh
+
+make build 2&gt;&amp;1       | rdw pipe --id build
+make test  2&gt;&amp;1       | rdw pipe --id test
+make bench 2&gt;&amp;1 | tee bench.log | rdw pipe --id bench
+</code></pre>
+<p><strong>Use case — ad-hoc with tee:</strong></p>
+<pre><code class="language-sh"># Unix standard: tee to a file, pipe to rdw
+long_computation 2&gt;&amp;1 | tee /tmp/run.log | rdw pipe --id run
+
+# Unix standard: split stream to multiple destinations
+complex_app 2&gt;&amp;1 | tee &gt;(grep ERROR &gt;&gt; errors.log) \
+                       &gt;(grep WARN  &gt;&gt; warnings.log) \
+                       | rdw pipe --id app
+</code></pre>
+<h3>Architecture changes</h3>
+<h4><code>cmd/rdw/commands.go</code></h4>
+<p>Remove from <code>pipeCmd.Flags()</code>:</p>
+<ul><li><code>--title</code></li>
+<li><code>--layout</code></li>
+<li><code>--filter</code> / <code>--stage</code></li>
+<li><code>--forward-to-file</code></li>
+<li><code>--forward-to-cmd</code></li>
+<li><code>--forward</code></li>
+</ul>
+<p>Remove from <code>runPipe</code>:</p>
+<ul><li>Title PATCH call</li>
+<li>Layout apply call</li>
+<li>Filter registration loop</li>
+<li>Mirror sink setup</li>
+<li>Hybrid reader (see Recommendation 5)</li>
+</ul>
+<p><code>runPipe</code> becomes:</p>
+<pre><code class="language-go">func runPipe(cmd *cobra.Command, _ []string) error {
+    idStr, _ := cmd.Flags().GetString(&#34;id&#34;)
+    id, err := session.ParseTargetID(idStr)
+    if err != nil {
+        return fmt.Errorf(&#34;invalid target ID %q: %w&#34;, idStr, err)
+    }
+
+    port := portFlag(cmd)
+    resolved, err := discovery.Resolve(port)
+    if err != nil {
+        return err
+    }
+
+    socketPath, _ := unixSocketPath(fmt.Sprintf(&#34;%d&#34;, resolved))
+
+    return pipepkg.Relay(context.Background(), os.Stdin, pipepkg.Options{
+        TargetID:          id,
+        Port:              resolved,
+        SocketPath:        socketPath,
+        ReconnectQueueLen: 1000,
+    })
+}
+</code></pre>
+<h4>Migration and backward compatibility</h4>
+<p>The removed flags are kept as <strong>deprecated aliases</strong> that print a warning and delegate to the equivalent command before piping:</p>
+<pre><code class="language-sh"># Deprecated: rdw pipe --title &#34;My Pane&#34; --id log
+# Warning: --title is deprecated; use: rdw pane rename log &#34;My Pane&#34;
+# The flag still works in rdw 2.x but will be removed in 3.0
+</code></pre>
+<p>This gives users time to migrate their scripts.</p>
+<h3>Why this is more Unix</h3>
+<p>A pipe is a transport. Configuration of the endpoint (layout, title, stages) is orthogonal to data transport and should not be coupled to it. Mirroring is what <code>tee(1)</code> is for — rdw does not need to re-implement it. Splitting streams is what process substitution (<code>&gt;(cmd)</code>) is for.</p>
+<p>When <code>rdw pipe</code> is dumb, a user can reason about it in isolation. When it is smart, the user must understand the order of operations inside <code>rdw pipe</code> before understanding the pipeline.</p>
+<hr>
+<h2>Recommendation 4 — Serve the SPA from a configurable directory</h2>
+<h3>The problem</h3>
+<p>The browser SPA is <code>internal/server/frontend.go</code> — a Go file containing a multi-thousand-line HTML/CSS/JS string literal. To change the display (different colour scheme, additional widgets, custom keyboard shortcuts beyond the 32 supported actions) a user must fork rdw, edit the Go source, and recompile.</p>
+<p>In bash-rd, the formatter <em>is</em> the display. You write a shell function that emits arbitrary HTML. You own the page completely. rdw replaced this with a fixed SPA that the user cannot modify.</p>
+<h3>Target design</h3>
+<p><code>rdw server start --frontend DIR</code> serves files from <code>DIR</code> at <code>/</code>. The embedded SPA is the default when no <code>--frontend</code> is given.</p>
+<pre><code>GET /          → serve DIR/index.html (or embedded default)
+GET /rdw.js   → serve DIR/rdw.js (or embedded default)
+GET /style.css → serve DIR/style.css (or embedded default)
+</code></pre>
+<p>The server exposes a <strong>stable JavaScript API</strong> that any custom frontend can use. The API contract:</p>
+<pre><code class="language-js">// rdw-api.js — stable contract the server guarantees
+const rdw = {
+    // Connect to the WebSocket stream
+    connect(token) → EventEmitter,
+
+    // REST wrappers
+    getSession()   → Promise&lt;Session&gt;,
+    getBindings()  → Promise&lt;Bindings&gt;,
+    getStatus()    → Promise&lt;Status&gt;,
+    postStream(id, line) → Promise&lt;void&gt;,
+    // ... etc
+};
+</code></pre>
+<p>This is served at <code>/rdw-api.js</code> and never changes between versions.</p>
+<h3>User-facing interface</h3>
+<p><strong>Default (no change):</strong></p>
+<pre><code class="language-sh">rdw server start --open-browser
+</code></pre>
+<p>Serves the embedded SPA.</p>
+<p><strong>Custom frontend:</strong></p>
+<pre><code class="language-sh">rdw server start --frontend ~/my-rdw-ui/ --open-browser
+</code></pre>
+<p>Serves <code>~/my-rdw-ui/index.html</code>. The custom page connects to the same WebSocket and REST API.</p>
+<p><strong>Use case — minimal text-only display:</strong></p>
+<pre><code class="language-html">&lt;!-- ~/my-rdw-ui/index.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;style&gt;
+  body { background: #000; color: #0f0; font: 13px monospace; }
+  .pane { border: 1px solid #0f0; padding: 8px; margin: 8px; height: 300px; overflow-y: scroll; }
+&lt;/style&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&#34;log&#34; class=&#34;pane&#34;&gt;&lt;/div&gt;
+&lt;script src=&#34;/rdw-api.js&#34;&gt;&lt;/script&gt;
+&lt;script&gt;
+  const ws = rdw.connect(&#39;&#39;);
+  ws.on(&#39;line&#39;, ({target_id, line}) =&gt; {
+    if (target_id === &#39;log&#39;) {
+      const el = document.getElementById(&#39;log&#39;);
+      el.innerHTML += line + &#39;\n&#39;;
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<p><strong>Use case — custom dashboard with D3 graphs:</strong></p>
+<pre><code class="language-html">&lt;script src=&#34;https://d3js.org/d3.v7.min.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rdw-api.js&#34;&gt;&lt;/script&gt;
+&lt;script&gt;
+  // KV changes drive a D3 chart
+  const ws = rdw.connect(TOKEN);
+  const chart = d3.select(&#39;#chart&#39;);
+
+  ws.on(&#39;kv_update&#39;, async () =&gt; {
+    const kv = await rdw.getKV(&#39;metrics.&#39;);
+    updateChart(chart, kv);
+  });
+&lt;/script&gt;
+</code></pre>
+<p><strong>Use case — embed rdw in an existing web application:</strong></p>
+<pre><code class="language-html">&lt;!-- In your existing app --&gt;
+&lt;iframe src=&#34;http://localhost:7681?token=xxx&#34; style=&#34;width:100%;height:400px&#34;&gt;
+&lt;/iframe&gt;
+
+&lt;!-- Or use the API directly from your app&#39;s JS --&gt;
+&lt;script src=&#34;http://localhost:7681/rdw-api.js&#34;&gt;&lt;/script&gt;
+</code></pre>
+<h3>Architecture changes</h3>
+<h4><code>internal/config/config.go</code></h4>
+<pre><code class="language-go">type ServerConfig struct {
+    // ... existing fields
+    FrontendDir string `yaml:&#34;frontend_dir&#34;` // empty = use embedded SPA
+}
+</code></pre>
+<h4><code>cmd/rdw/server.go</code></h4>
+<pre><code class="language-sh">serverStartCmd.Flags().String(&#34;frontend&#34;, &#34;&#34;,
+    &#34;serve custom SPA from this directory instead of the embedded default&#34;)
+</code></pre>
+<h4><code>internal/server/routes.go</code></h4>
+<pre><code class="language-go">func handleFrontend(w http.ResponseWriter, r *http.Request) {
+    if frontendDir != &#34;&#34; {
+        http.FileServer(http.Dir(frontendDir)).ServeHTTP(w, r)
+        return
+    }
+    // embedded default
+    w.Header().Set(&#34;Content-Type&#34;, &#34;text/html; charset=utf-8&#34;)
+    _, _ = w.Write(frontendHTML)
+}
+</code></pre>
+<h4>New: <code>internal/server/rdwapi.js</code></h4>
+<p>A stable, versioned JS file served at <code>/rdw-api.js</code>:</p>
+<pre><code class="language-js">// rdw-api.js v1
+// Stable API contract — safe to depend on across rdw versions.
+(function(global) {
+  &#39;use strict&#39;;
+
+  function connect(token) {
+    const url = &#39;ws://&#39; + location.host + &#39;/api/v1/ws&#39; +
+                (token ? &#39;?token=&#39; + encodeURIComponent(token) : &#39;&#39;);
+    const ws = new WebSocket(url, [&#39;rdw-v1&#39;]);
+    const handlers = {};
+
+    ws.onmessage = function(e) {
+      const msg = JSON.parse(e.data);
+      const type = msg.type || &#39;line&#39;;
+      if (handlers[type]) handlers[type].forEach(fn =&gt; fn(msg));
+    };
+
+    return {
+      on(type, fn) { (handlers[type] = handlers[type] || []).push(fn); return this; },
+      send(id, line) { ws.send(JSON.stringify({type:&#39;line&#39;,target_id:id,line})); }
+    };
+  }
+
+  async function get(path) {
+    const r = await fetch(&#39;/api/v1/&#39; + path);
+    return r.json();
+  }
+
+  async function post(path, body) {
+    return fetch(&#39;/api/v1/&#39; + path, {
+      method: &#39;POST&#39;,
+      headers: {&#39;Content-Type&#39;: &#39;application/json&#39;},
+      body: JSON.stringify(body)
+    });
+  }
+
+  global.rdw = { connect, getSession: () =&gt; get(&#39;session&#39;),
+                  getStatus: () =&gt; get(&#39;status&#39;), getBindings: () =&gt; get(&#39;bindings&#39;) };
+})(window);
+</code></pre>
+<h3>Why this is more Unix</h3>
+<p>&#34;Write programs that do not assume they know the best way to display their output&#34; — this is the fundamental tension. rdw&#39;s embedded SPA assumes it knows the best display. The configurable frontend directory restores the user&#39;s ownership of the display, which is exactly what bash-rd&#39;s formatter model provided — at the cost of needing to know HTML instead of just bash.</p>
+<p>The stable JS API is the contract the server guarantees, analogous to how bash-rd&#39;s <code>$rd_line</code> and <code>$rd_kv_*</code> variables are the contract the server offers to formatters.</p>
+<hr>
+<h2>Recommendation 5 — Replace sentinel framing with standard encoding</h2>
+<h3>The problem</h3>
+<p>The <code>image:</code> / <code>image:end</code> sentinel-framed binary protocol in the pipe:</p>
+<ol><li><strong>Is fragile</strong> — if binary data contains a line that is exactly <code>image:end</code>,</li>
+</ol>
+<p>   the frame closes early and the remaining bytes corrupt the next line 2. <strong>Duplicates <code>base64(1)</code></strong> — Unix already has a tool for encoding binary    as text; inventing a new framing scheme is not necessary 3. <strong>Leaks into <code>rdw pipe</code></strong> — the hybrid reader that handles sentinel frames    is non-trivial code in the relay path, adding complexity to what should be    a transparent conduit 4. <strong>Is invisible</strong> — you cannot see what is being sent because rdw intercepts    and re-encodes inside <code>rdw pipe</code></p>
+<p>The correct Unix answer: the producer is responsible for encoding. rdw is responsible for routing.</p>
+<h3>Target design</h3>
+<p>Remove <code>image:</code> / <code>image:end</code> and <code>svg:</code> / <code>svg:end</code> sentinel sequences.</p>
+<p>Binary data arrives pre-encoded as base64, prefixed with the appropriate control sequence:</p>
+<pre><code class="language-sh"># Image (standard Unix tools)
+base64 chart.png | sed &#39;1s/^/b64:/&#39; | rdw pipe --id chart
+
+# Or more clearly:
+{ echo &#34;f:image&#34; ; base64 chart.png ; } | rdw pipe --id chart
+</code></pre>
+<p>SVG is text, so it does not need encoding — it arrives as plain lines:</p>
+<pre><code class="language-sh">{ echo &#34;f:svg&#34; ; cat diagram.svg ; } | rdw pipe --id diagram
+</code></pre>
+<p>The <code>f:svg</code> formatter handles multi-line SVG by accumulating lines until the scrollback buffer contains a complete SVG document (detected by <code>&lt;/svg&gt;</code> end tag), then renders it.</p>
+<h3><code>rdw send</code> as the convenience layer</h3>
+<p><code>rdw send</code> is the right place for convenience. It is explicitly a helper command, not a pipe. It reads a file, detects type, encodes if necessary, and sends the appropriate control lines. Its implementation is transparent:</p>
+<pre><code class="language-sh"># What rdw send --id chart chart.png actually does:
+echo &#34;f:image&#34;
+base64 chart.png
+rdw pipe --id chart  # inside rdw send
+</code></pre>
+<p>Users who do not want the magic of <code>rdw send</code> can always compose it manually. Users who want the magic use <code>rdw send</code>. The pipeline is visible either way.</p>
+<h3>Architecture changes</h3>
+<h4>Remove from <code>internal/control/control.go</code></h4>
+<pre><code class="language-go">// Remove:
+KindImage   Kind = &#34;image&#34;
+KindSVG     Kind = &#34;svg&#34;
+SentinelImageEnd = &#34;image:end&#34;
+SentinelSVGEnd   = &#34;svg:end&#34;
+</code></pre>
+<h4>Remove from <code>internal/pipe/hybrid.go</code></h4>
+<p>The entire <code>hybridReader</code> type and its <code>accumBinary</code> / <code>accumSVG</code> methods are deleted. <code>relay()</code> in <code>pipe.go</code> returns to using a plain <code>bufio.Scanner</code>.</p>
+<h4>Add <code>f:svg</code> formatter</h4>
+<p>A new <code>SVGFormatter</code> that accumulates lines until it sees <code>&lt;/svg&gt;</code>, then renders the complete SVG inline:</p>
+<pre><code class="language-go">// internal/format/svg.go
+type SVGFormatter struct{}
+
+func (f *SVGFormatter) Name() string { return &#34;svg&#34; }
+
+func (f *SVGFormatter) Format(lines []string, kv map[string]string) (string, error) {
+    raw := strings.Join(lines, &#34;\n&#34;)
+    // Find last complete SVG document
+    start := strings.LastIndex(raw, &#34;&lt;svg&#34;)
+    end   := strings.LastIndex(raw, &#34;&lt;/svg&gt;&#34;)
+    if start &lt; 0 || end &lt; 0 || end &lt; start {
+        return &#34;&lt;div class=&#39;rdw-svg-waiting&#39;&gt;awaiting complete SVG...&lt;/div&gt;&#34;, nil
+    }
+    svg := raw[start : end+6]  // include &lt;/svg&gt;
+    scale := kv[&#34;image.scale&#34;]
+    if scale == &#34;&#34; { scale = &#34;fit&#34; }
+    return fmt.Sprintf(`&lt;div class=&#34;rdw-svg-block rdw-scale-%s&#34;&gt;%s&lt;/div&gt;`, scale, svg), nil
+}
+</code></pre>
+<h4>Update browser SPA</h4>
+<p>The <code>image_render</code> and <code>svg_render</code> WebSocket messages sent by the server&#39;s control handler (for <code>image:</code> and <code>svg:</code> blocks) are removed. The browser renders base64 images via the <code>image</code> formatter when <code>POST /api/v1/panes/{id}/format</code> is called, or per-line via an HTML stage (Recommendation 1).</p>
+<h4><code>rdw send</code> stays unchanged</h4>
+<p><code>rdw send</code> internally does:</p>
+<pre><code class="language-go">case isImage:
+    return &#34;f:image\nb64:&#34; + base64.StdEncoding.EncodeToString(data)
+case isSVG:
+    return &#34;f:svg\n&#34; + string(data)
+</code></pre>
+<p>This is exactly what the user would do manually. The composition is visible.</p>
+<h3>User-facing migration</h3>
+<table>
+<tr><th>Old</th><th>New</th></tr>
+<tr><td>`{ echo &#34;image:&#34;; cat img.png; echo &#34;image:end&#34;; } \</td><td>rdw pipe --id p`</td><td>`{ echo &#34;f:image&#34;; base64 img.png; } \</td><td>rdw pipe --id p`</td></tr>
+<tr><td>`{ echo &#34;svg:&#34;; cat d.svg; echo &#34;svg:end&#34;; } \</td><td>rdw pipe --id p`</td><td>`{ echo &#34;f:svg&#34;; cat d.svg; } \</td><td>rdw pipe --id p`</td></tr>
+<tr><td><code>rdw send --id p img.png</code></td><td>unchanged</td></tr>
+</table>
+<p>The new form is actually shorter and uses <code>base64(1)</code> — a standard Unix tool every developer already knows.</p>
+<h3>Why this is more Unix</h3>
+<p>&#34;Use the output of every program as the input of another&#34; requires that programs agree on encoding. The encoding for binary-in-text streams is already standardised: base64. rdw&#39;s sentinel framing is a second, incompatible encoding. Removing it reduces the number of protocols the user must understand from two to one.</p>
+<p>The fragility problem also disappears: base64 output never contains the sequence <code>b64:</code> or <code>f:image</code>, so there are no framing edge cases.</p>
+<hr>
+<h2>Implementation order</h2>
+<p>The five recommendations interact. The correct implementation order minimises disruption:</p>
+<ol><li><strong>Recommendation 2 (KV in built-in formatters)</strong> — purely additive,</li>
+</ol>
+<p>   no breaking changes, can ship independently</p>
+<ol><li><strong>Recommendation 5 (remove sentinel framing)</strong> — removes code and a</li>
+</ol>
+<p>   control sequence; <code>rdw send</code> covers the convenience case; ship with a    deprecation warning in rdw 2.x before removal in 3.0</p>
+<ol><li><strong>Recommendation 1 (collapse filter/formatter into stage)</strong> — additive</li>
+</ol>
+<p>   first (add <code>--stage</code>, keep <code>--filter</code>), then deprecate <code>--filter</code> in 2.x</p>
+<ol><li><strong>Recommendation 4 (configurable frontend)</strong> — additive; embedded SPA</li>
+</ol>
+<p>   remains the default; <code>--frontend</code> is a new option</p>
+<ol><li><strong>Recommendation 3 (dumb pipe)</strong> — most disruptive; do last, after 1–4</li>
+</ol>
+<p>   are in place and users have migrated; deprecate removed flags in 2.x,    remove in 3.0</p>
+<p>Each step makes rdw more composable and more Unix-like without breaking existing users immediately.</p>
+
+<div id="nav-bar"><a href="unix-analysis.html">← Unix Philosophy Analysis</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>
