@@ -51,4 +51,5 @@
 - [Improvements](dev/improvements.md)
 - [Unix Philosophy Analysis](dev/unix-analysis.md)
 - [Unix Redesign Design](dev/unix-redesign.md)
+- [Formatter Model Analysis](dev/formatter-model-analysis.md)
 - [Worklog](dev/worklog.md)
