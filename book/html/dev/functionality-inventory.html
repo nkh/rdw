@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Functionality Inventory — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="unix-analysis.html">Unix Philosophy Analysis</a></li><li><a href="unix-redesign.html">Unix Redesign Design</a></li><li><a href="formatter-model-analysis.html">Formatter Model Analysis</a></li><li><a href="functionality-inventory.html" class="active">Functionality Inventory</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw functionality inventory</h1>
+<p>Every feature in rdw, whether it is Unix-like, and what could replace it.</p>
+<p>Unix-like rating:</p>
+<ul><li><strong>YES</strong> — follows Unix principles; composable, single-purpose, transparent</li>
+<li><strong>PARTIAL</strong> — some Unix alignment but carries extra concerns</li>
+<li><strong>NO</strong> — violates Unix principles; better done outside rdw</li>
+</ul>
+<hr>
+<h2>Transport</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Shell replacement</th></tr>
+<tr><td><code>rdw pipe --id ID</code></td><td>Read stdin, relay lines to named pane</td><td>PARTIAL</td><td>Is essentially <code>netcat</code>/<code>socat</code> to a named socket; Unix but <code>--layout</code>, <code>--filter</code>, <code>--title</code> flags corrupt it</td></tr>
+<tr><td><code>--forward-to-file</code></td><td>Mirror stream to a file/FIFO</td><td>NO</td><td>`tee logfile \</td><td>rdw pipe`</td></tr>
+<tr><td><code>--forward-to-cmd</code></td><td>Mirror stream to a shell command</td><td>NO</td><td>`tee &gt;(cmd) \</td><td>rdw pipe`</td></tr>
+<tr><td>`--forward rd\</td><td>both`</td><td>Also send stream to bash-rd</td><td>NO</td><td>`tee &gt;(rd -c ID) \</td><td>rdw pipe`</td></tr>
+<tr><td><code>--layout NAME</code> on pipe</td><td>Apply layout before streaming</td><td>NO</td><td>`rdw layout apply NAME &amp;&amp; prog \</td><td>rdw pipe`</td></tr>
+<tr><td><code>--title TEXT</code> on pipe</td><td>Set pane title on connect</td><td>NO</td><td>`rdw pane rename ID TITLE &amp;&amp; prog \</td><td>rdw pipe`</td></tr>
+<tr><td><code>--filter CMD</code> on pipe</td><td>Attach filter stage</td><td>NO</td><td>`prog \</td><td>CMD \</td><td>rdw pipe`</td></tr>
+<tr><td>Reconnect queue (1000 lines)</td><td>Buffer lines when server unreachable</td><td>PARTIAL</td><td>Useful but belongs in a thin retry wrapper, not the relay</td></tr>
+<tr><td><code>rdw send FILE</code></td><td>Send file to pane (auto-detect type)</td><td>PARTIAL</td><td>Convenience over `base64 FILE \</td><td>rdw pipe`; hides composition</td></tr>
+<tr><td>Hybrid binary reader (<code>image:end</code>)</td><td>Sentinel-framed binary in text stream</td><td>NO</td><td>`base64 img.png \</td><td>rdw pipe`; sentinel framing is a homemade protocol</td></tr>
+</table>
+<hr>
+<h2>Server core</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>HTTP server (port 7681)</td><td>Serves REST API and SPA</td><td>YES</td><td>Core function; cannot be composed away</td></tr>
+<tr><td>WebSocket hub (<code>rdw-v1</code>)</td><td>Pushes lines to browsers</td><td>YES</td><td>Core function</td></tr>
+<tr><td>Unix socket auth</td><td>Owner-only local access</td><td>YES</td><td>Core Unix pattern</td></tr>
+<tr><td>Multi-server discovery</td><td>Registry at <code>~/.cache/rdw/servers.json</code></td><td>YES</td><td>Analogous to PID files</td></tr>
+<tr><td><code>--network-expose</code></td><td>Bind to all interfaces</td><td>YES</td><td>Standard server flag</td></tr>
+<tr><td><code>GET /api/v1/ping</code></td><td>Health check</td><td>YES</td><td>Standard</td></tr>
+<tr><td><code>GET /api/v1/ws</code></td><td>WebSocket upgrade</td><td>YES</td><td>Core function</td></tr>
+<tr><td><code>POST /api/v1/stream/{id}</code></td><td>HTTP line ingest</td><td>YES</td><td>HTTP alternative to Unix socket</td></tr>
+</table>
+<hr>
+<h2>Session and layout</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Windows (named groups of panes)</td><td>Server-managed tmux-like views</td><td>YES</td><td>Core function; this is what makes rdw a browser tool not just <code>netcat</code></td></tr>
+<tr><td><code>rdw window create/close/rename/focus/list</code></td><td>Window management</td><td>YES</td><td>Core function</td></tr>
+<tr><td><code>rdw pane split/resize/zoom/swap/close</code></td><td>Pane geometry</td><td>YES</td><td>Core function</td></tr>
+<tr><td><code>rdw pane rename ID TITLE</code></td><td>Set pane display title</td><td>YES</td><td>Could be a KV key (<code>kv:pane.ID.title=TEXT</code>) but dedicated command is cleaner</td></tr>
+<tr><td>Layout YAML files</td><td>Declarative window/pane arrangement</td><td>YES</td><td>Config-as-data; Unix-like</td></tr>
+<tr><td><code>rdw layout apply/save/list</code></td><td>Layout management</td><td>YES</td><td>Core function</td></tr>
+<tr><td><code>rdw layout apply</code> on <code>rdw pipe</code></td><td>Apply layout at pipe time</td><td>NO</td><td>`rdw layout apply NAME &amp;&amp; prog \</td><td>rdw pipe`</td></tr>
+<tr><td>Pane groups (hide/show/focus/kill)</td><td>Batch pane operations by group name</td><td>PARTIAL</td><td>Useful but could be a naming convention (<code>ID_group</code>) plus a shell loop</td></tr>
+<tr><td><code>rdw group hide/show/focus/kill</code></td><td>Group actions</td><td>PARTIAL</td><td>Shell loop over <code>rdw pane close</code> for each group member</td></tr>
+<tr><td>Gutter drag-to-resize</td><td>Browser UI resize</td><td>YES</td><td>Core browser function</td></tr>
+<tr><td>Scrollback buffer (10,000 lines)</td><td>Stores all received lines per pane</td><td>NO</td><td>Violates formatter authority; should be a thin ring buffer for reconnect only</td></tr>
+<tr><td>Session restore (<code>--restore</code>)</td><td>Reload KV and layout on server start</td><td>PARTIAL</td><td>Useful; the KV part is fine; layout restore is config-file territory</td></tr>
+</table>
+<hr>
+<h2>Key-value store</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>In-memory KV per session</td><td><code>key=value</code> store shared across panes</td><td>YES</td><td>Core bash-rd concept; correct</td></tr>
+<tr><td><code>=:key=value</code> inline control sequence</td><td>Write KV from stream</td><td>YES</td><td>Core bash-rd concept</td></tr>
+<tr><td><code>rdw kv set/get/delete/list</code></td><td>KV management CLI</td><td>YES</td><td>Thin wrapper over REST API</td></tr>
+<tr><td><code>GET/PUT/DELETE /api/v1/kv</code></td><td>KV REST API</td><td>YES</td><td>Correct</td></tr>
+<tr><td>KV injection into filters</td><td>Env vars in filter subprocess</td><td>YES</td><td>Correct; bash-rd faithful</td></tr>
+<tr><td>KV injection into user formatters</td><td>Env vars in formatter subprocess</td><td>YES</td><td>Correct</td></tr>
+<tr><td>KV in built-in formatters</td><td>Built-in formatters read KV keys</td><td>NO</td><td>Built-in formatters should not exist (see formatters section)</td></tr>
+<tr><td>SQLite persistence (<code>--kv-persist</code>)</td><td>Persist KV across restarts</td><td>PARTIAL</td><td>Useful; analogous to a dot-file</td></tr>
+<tr><td>KV namespace convention (<code>window:N:key</code>)</td><td>Informal namespacing by prefix</td><td>YES</td><td>Convention, not enforcement; correct</td></tr>
+</table>
+<hr>
+<h2>Filtering</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td><code>--filter CMD</code> on <code>rdw pipe</code></td><td>Attach per-line shell command filter</td><td>NO</td><td>`prog \</td><td>CMD \</td><td>rdw pipe`; the pipe IS the filter chain</td></tr>
+<tr><td><code>POST /api/v1/panes/{id}/filters</code></td><td>Register filter via API</td><td>NO</td><td>Same; filter belongs in the shell before <code>rdw pipe</code></td></tr>
+<tr><td><code>CmdFilter</code> (long-lived subprocess)</td><td>Keeps filter process alive per pane</td><td>NO</td><td>If filter is in the shell, no server-side filter needed</td></tr>
+<tr><td>Filter chain (max 8 stages)</td><td>Multiple filter stages per pipeline</td><td>NO</td><td>Unlimited stages in the shell: `prog \</td><td>f1 \</td><td>f2 \</td><td>f3 \</td><td>rdw pipe`</td></tr>
+<tr><td>KV injection into filters</td><td>Pass KV snapshot as env to filter</td><td>PARTIAL</td><td>Correct idea but wrong layer; env injection should happen in the shell</td></tr>
+</table>
+<hr>
+<h2>Formatters</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Built-in <code>text</code> formatter</td><td>ANSI passthrough</td><td>NO</td><td>Should not exist; the formatter is user code</td></tr>
+<tr><td>Built-in <code>json</code> formatter</td><td>JSON syntax highlight</td><td>NO</td><td>`prog \</td><td>python3 -m json.tool \</td><td>rdw pipe` or user formatter</td></tr>
+<tr><td>Built-in <code>yaml</code> formatter</td><td>YAML highlight</td><td>NO</td><td>User formatter</td></tr>
+<tr><td>Built-in <code>markdown</code> formatter</td><td>Markdown to HTML</td><td>NO</td><td>User formatter (<code>pandoc</code>, <code>cmark</code>)</td></tr>
+<tr><td>Built-in <code>csv</code> formatter</td><td>CSV to sortable table</td><td>NO</td><td>User formatter</td></tr>
+<tr><td>Built-in <code>image</code> formatter</td><td>base64 → <code>&lt;img&gt;</code></td><td>NO</td><td>User formatter</td></tr>
+<tr><td>On-demand formatting (<code>POST /api/v1/panes/{id}/format</code>)</td><td>Apply formatter to scrollback</td><td>NO</td><td>If formatter runs per-line there is nothing to apply on demand</td></tr>
+<tr><td>User-defined formatter (external command)</td><td>Shell script → HTML per invocation</td><td>YES</td><td>This is the correct model; the only formatter type that should exist</td></tr>
+<tr><td><code>rdw formatter register/unregister/list</code></td><td>Manage user formatters</td><td>YES</td><td>Reasonable; analogous to a plugin registry</td></tr>
+<tr><td>Formatter save/restore on <code>image:</code>/<code>svg:</code></td><td>Server saves active formatter during binary block</td><td>NO</td><td>Side-effect hidden from user; user should set formatter explicitly</td></tr>
+<tr><td>Formatter registry in config (<code>formatters:</code> block)</td><td>Pre-register formatters at server start</td><td>YES</td><td>Reasonable config-as-data</td></tr>
+<tr><td>Sandboxed iframe for user formatter output</td><td>Output wrapped in <code>&lt;iframe sandbox&gt;</code></td><td>YES</td><td>Correct security model</td></tr>
+</table>
+<hr>
+<h2>Control sequences</h2>
+<table>
+<tr><th>Sequence</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td><code>v:</code> verbatim</td><td>Prevent interpretation</td><td>YES</td><td>Necessary escape hatch</td></tr>
+<tr><td><code>=:key=value</code> KV write</td><td>Write to session KV</td><td>YES</td><td>Core bash-rd concept</td></tr>
+<tr><td><code>f:NAME</code> formatter switch</td><td>Change active formatter</td><td>YES</td><td>Core; streamlined way to switch display mode</td></tr>
+<tr><td><code>b64:DATA</code> base64 passthrough</td><td>Binary in text stream</td><td>PARTIAL</td><td>Better than <code>image:</code> sentinel; `base64 \</td><td>rdw pipe` is cleaner</td></tr>
+<tr><td><code>bm:NAME</code> bookmark</td><td>Mark line in scrollback</td><td>NO</td><td>Relies on scrollback; remove with scrollback</td></tr>
+<tr><td><code>hl:PROFILE</code> highlight</td><td>Apply highlight profile</td><td>PARTIAL</td><td>Belongs in the formatter, not in a control sequence</td></tr>
+<tr><td>`sc:clear\</td><td>top\</td><td>bottom`</td><td>Scrollback control</td><td>NO (clear) / YES (top/bottom)</td><td>clear: remove with scrollback; top/bottom: useful browser scroll</td></tr>
+<tr><td><code>title:NAME</code></td><td>Set pane title</td><td>YES</td><td>Composable; producer can name its pane</td></tr>
+<tr><td><code>image:</code> / <code>image:end</code> sentinel</td><td>Binary image framing</td><td>NO</td><td>`base64 img \</td><td>rdw pipe`; fragile homemade protocol</td></tr>
+<tr><td><code>svg:</code> / <code>svg:end</code> sentinel</td><td>SVG framing</td><td>NO</td><td>SVG is text; just pipe it with <code>f:svg</code> set</td></tr>
+<tr><td><code>scale:MODE</code></td><td>Image scaling hint</td><td>PARTIAL</td><td>Belongs in the formatter&#39;s HTML output, not a separate sequence</td></tr>
+<tr><td><code>t:</code> timestamp toggle</td><td>Prepend timestamp</td><td>NO</td><td>`prog \</td><td>ts \</td><td>rdw pipe<code> (</code>ts` from moreutils)</td></tr>
+<tr><td><code>c:</code> clear scrollback</td><td>Clear display</td><td>NO</td><td>Remove with scrollback; <code>sc:clear</code> covers the browser side</td></tr>
+<tr><td><code>q:</code> quit server</td><td>Stop server from stream</td><td>NO</td><td><code>rdw server stop</code>; a stream should not control the server</td></tr>
+</table>
+<hr>
+<h2>Authentication and security</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Bearer token auth</td><td>SHA-256 hashed tokens per session</td><td>PARTIAL</td><td>Over-engineered for local use; correct for network use</td></tr>
+<tr><td><code>rdw token create/revoke/list</code></td><td>Token management</td><td>PARTIAL</td><td>Necessary for network use; not for local</td></tr>
+<tr><td>Per-pane/window token scope</td><td>Tokens restricted to specific panes</td><td>PARTIAL</td><td>Fine-grained but complex</td></tr>
+<tr><td>Unix socket 0600 (no token)</td><td>Owner-only local access</td><td>YES</td><td>Core Unix pattern; correct</td></tr>
+<tr><td>Admin-local-only loopback guard</td><td>Restrict admin API to loopback</td><td>YES</td><td>Correct network hygiene</td></tr>
+<tr><td><code>--no-auth</code> flag</td><td>Disable token auth</td><td>YES</td><td>Correct development mode</td></tr>
+<tr><td>Rate limiting (10 req/min unauth)</td><td>Protect unauthenticated endpoints</td><td>YES</td><td>Reasonable for network service</td></tr>
+<tr><td>Admin token (<code>--admin-token</code>)</td><td>Separate token for <code>/admin</code> page</td><td>YES</td><td>Correct separation of concerns</td></tr>
+</table>
+<hr>
+<h2>Browser SPA</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Embedded SPA in binary</td><td>HTML/CSS/JS compiled into Go binary</td><td>NO</td><td>Serve from a configurable directory; embedded is the default</td></tr>
+<tr><td>ANSI colour parser (16/256/truecolour)</td><td>Decode escape sequences to CSS</td><td>YES</td><td>Core display function</td></tr>
+<tr><td>Per-pane DOM scrollback (10k lines)</td><td>Ring buffer of recent lines in browser</td><td>PARTIAL</td><td>10k is too large; 200–500 for reconnect is enough</td></tr>
+<tr><td>Gutter drag-to-resize</td><td>Mouse resize of panes</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>32-action keyboard dispatch</td><td>Vim-like pane/window navigation</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>Normal/swap/search mode</td><td>Modal keyboard input</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>Window header bar (click-to-focus)</td><td>Window tab strip</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>CSV column sort (client-side JS)</td><td>Click table header to sort</td><td>NO</td><td>Belongs in the formatter&#39;s HTML (e.g. <code>datatables.net</code>)</td></tr>
+<tr><td>Highlight profile rendering</td><td>Apply regex CSS classes to lines</td><td>NO</td><td>Belongs in the formatter</td></tr>
+<tr><td><code>image_render</code> / <code>svg_render</code> WS messages</td><td>Server-pushed image display</td><td>NO</td><td>Remove with sentinel framing</td></tr>
+<tr><td><code>pane_scale</code> WS message</td><td>Server-pushed scaling hint</td><td>NO</td><td>Belongs in formatter HTML</td></tr>
+<tr><td><code>formatter_set</code> WS message</td><td>Notify browser of formatter change</td><td>NO</td><td>Remove with built-in formatters</td></tr>
+<tr><td><code>scrollback_ctl</code> WS message</td><td>clear/top/bottom commands</td><td>PARTIAL</td><td>clear: remove; top/bottom: keep as scroll hints</td></tr>
+<tr><td>Double-click pane header to rename</td><td>Inline title edit</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>Right-click context menu</td><td>Zoom/split/rename/close</td><td>YES</td><td>Core browser UI</td></tr>
+</table>
+<hr>
+<h2>Introspection</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td><code>rdw status</code></td><td>Full server snapshot</td><td>YES</td><td>Core; necessary for a daemon</td></tr>
+<tr><td><code>rdw status pane ID</code></td><td>Per-pane detail</td><td>YES</td><td>Core; necessary</td></tr>
+<tr><td><code>GET /api/v1/status</code></td><td>Status REST endpoint</td><td>YES</td><td>Core</td></tr>
+<tr><td><code>/admin</code> page</td><td>Browser introspection dashboard</td><td>YES</td><td>Correct separate page</td></tr>
+<tr><td>Admin token auth</td><td>Separate access for introspection</td><td>YES</td><td>Correct</td></tr>
+<tr><td><code>GET /api/v1/admin/connections</code></td><td>Active WS connection count</td><td>YES</td><td>Core</td></tr>
+<tr><td><code>rdw selftest</code></td><td>Smoke test suite</td><td>YES</td><td>Correct; CI-friendly</td></tr>
+</table>
+<hr>
+<h2>Scrollback and export</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Scrollback buffer (10k lines per pane)</td><td>Server stores all received lines</td><td>NO</td><td>`prog \</td><td>tee logfile \</td><td>rdw pipe<code>; storage is </code>tee`&#39;s job</td></tr>
+<tr><td><code>rdw save pane/window/all</code></td><td>Export scrollback to Markdown</td><td>NO</td><td>Remove with scrollback; use <code>tee</code> + your editor</td></tr>
+<tr><td><code>POST /api/v1/export/*</code></td><td>Export REST endpoints</td><td>NO</td><td>Same</td></tr>
+<tr><td>ANSI stripping in export</td><td>Remove escape sequences from stored lines</td><td>NO</td><td>`cat logfile \</td><td>sed &#39;s/\x1b\[[0-9;]*m//g&#39;`</td></tr>
+<tr><td>Image assets in export</td><td>Decode base64 images into files</td><td>NO</td><td><code>base64 -d</code></td></tr>
+<tr><td>Scrollback bookmarks</td><td>Named line indices</td><td>NO</td><td>Remove with scrollback</td></tr>
+<tr><td><code>bm:</code> / bookmark API</td><td>Create/list/delete bookmarks</td><td>NO</td><td>Remove with scrollback</td></tr>
+</table>
+<hr>
+<h2>Advanced / peripheral features</h2>
+<table>
+<tr><th>Feature</th><th>Description</th><th>Unix-like</th><th>Replacement</th></tr>
+<tr><td>Focus cycle (<code>rdw cycle start/stop/status</code>)</td><td>Auto-rotate window focus</td><td>YES</td><td>Core browser function for dashboards</td></tr>
+<tr><td>Highlight profiles (<code>rdw highlight</code>)</td><td>Named regex → CSS class rules</td><td>NO</td><td>Belongs in user formatter; formatter writes <code>&lt;span class=&#34;x&#34;&gt;</code></td></tr>
+<tr><td><code>GET/PUT/DELETE /api/v1/highlights</code></td><td>Highlight REST API</td><td>NO</td><td>Same</td></tr>
+<tr><td>Terminal panes (<code>rdw pane terminal</code>)</td><td>Launch gotty/socat shell in pane</td><td>NO</td><td>rdw wraps <code>ttyd</code>; use <code>ttyd</code> directly in a browser tab</td></tr>
+<tr><td>KV persistence (SQLite, <code>--kv-persist</code>)</td><td>Persist KV across restarts</td><td>PARTIAL</td><td>Reasonable; like a dot-file</td></tr>
+<tr><td><code>rdw send FILE</code></td><td>File to pane with type detection</td><td>PARTIAL</td><td>Convenience; hides <code>base64</code>/<code>cat</code> pipeline</td></tr>
+<tr><td>Mirror (<code>--forward-to-file/cmd</code>)</td><td>Tee the stream</td><td>NO</td><td><code>tee</code></td></tr>
+<tr><td><code>--forward rd</code> bash-rd compat</td><td>Tee to bash-rd</td><td>NO</td><td><code>tee &gt;(rd -c ID)</code></td></tr>
+<tr><td><code>rdw pane zoom</code></td><td>Full-window zoom on a pane</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td><code>rdw pane swap</code></td><td>Exchange pane positions</td><td>YES</td><td>Core browser UI</td></tr>
+<tr><td>Bindings config (<code>bindings:</code> in YAML)</td><td>Remap keyboard shortcuts</td><td>YES</td><td>Correct</td></tr>
+<tr><td><code>GET /api/v1/bindings</code></td><td>Serve binding map to browser</td><td>YES</td><td>Correct</td></tr>
+</table>
+<hr>
+<h2>Summary counts</h2>
+<table>
+<tr><th>Rating</th><th>Count</th><th>Implication</th></tr>
+<tr><td>YES — Unix-like</td><td>~40</td><td>Keep as-is</td></tr>
+<tr><td>PARTIAL — mixed</td><td>~20</td><td>Simplify or make optional</td></tr>
+<tr><td>NO — should be outside rdw</td><td>~35</td><td>Remove or move to shell / user code</td></tr>
+</table>
+<p>Of the ~35 NO items, the largest clusters are:</p>
+<ol><li><strong>Built-in formatters</strong> (6 items) — all should be user code</li>
+<li><strong>Scrollback and export</strong> (7 items) — storage is <code>tee</code>&#39;s job</li>
+<li><strong>Filter chain server-side</strong> (5 items) — filtering is the shell&#39;s job</li>
+<li><strong>Transport flags on <code>rdw pipe</code></strong> (5 items) — mirroring, forwarding, layout apply, title, filter belong in the shell</li>
+<li><strong>Sentinel framing</strong> (2 items) — <code>image:end</code>, <code>svg:end</code> — use standard <code>base64</code></li>
+<li><strong>Browser-side rendering that belongs in formatter</strong> (4 items) — highlight, CSV sort, image_render, pane_scale</li>
+</ol>
+
+<div id="nav-bar"><a href="formatter-model-analysis.html">← Formatter Model Analysis</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>

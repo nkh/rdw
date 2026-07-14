@@ -52,4 +52,5 @@
 - [Unix Philosophy Analysis](dev/unix-analysis.md)
 - [Unix Redesign Design](dev/unix-redesign.md)
 - [Formatter Model Analysis](dev/formatter-model-analysis.md)
+- [Functionality Inventory](dev/functionality-inventory.md)
 - [Worklog](dev/worklog.md)
