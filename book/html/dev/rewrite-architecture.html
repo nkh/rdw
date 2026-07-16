@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rewrite Architecture — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="unix-analysis.html">Unix Philosophy Analysis</a></li><li><a href="unix-redesign.html">Unix Redesign Design</a></li><li><a href="formatter-model-analysis.html">Formatter Model Analysis</a></li><li><a href="functionality-inventory.html">Functionality Inventory</a></li><li><a href="rewrite-architecture.html" class="active">Rewrite Architecture</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw rewrite — component architecture</h1>
+<h2>Premise</h2>
+<h1>[1] The fundamental insight: rdw is not one tool. It is a web layout server,</h1>
+<h1>a line relay, a KV store, a session manager, a browser SPA, an auth system,</h1>
+<h1>a formatter runner, and a filter chain. These are seven different tools that</h1>
+<h1>grew into one binary because it was convenient. The rewrite separates them.</h1>
+<h1>[2] The goal is not to make rdw smaller — it is to make each component</h1>
+<h1>independently useful, testable, and replaceable by a Unix user who does not</h1>
+<h1>want the full stack.</h1>
+<h1>[3] bash-rd&#39;s lesson: the server should be so small that a user can read and</h1>
+<h1>understand it in five minutes. Everything else is composition.</h1>
+<h1>[4] The rewrite targets two audiences: the developer who wants <code>rdw pipe</code></h1>
+<h1>to just work, and the power user who wants to replace any layer with their</h1>
+<h1>own code. Both must be satisfied without compromise.</h1>
+<hr>
+<h2>Component map</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│  USER INTERFACE LAYER                                           │
+│                                                                 │
+│  rdw-cli (Go)        rdw-compose (bash)     browser            │
+│  thin REST client    argument → pipeline     SPA or custom      │
+│  one flag → one      composition engine      via /rdw-api.js    │
+│  REST call           (generates shell)                          │
+└───────────────┬──────────────────┬───────────────┬─────────────┘
+                │                  │               │
+                ▼                  ▼               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  rdw-server (Go) — the only persistent process                  │
+│                                                                 │
+│  rdw-layout-server   rdw-kv-server   rdw-ws-hub                 │
+│  window/pane mgmt    KV store        WebSocket fan-out          │
+│  REST endpoints      REST + events   line broadcast             │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                ┌───────────────┴───────────────┐
+                ▼                               ▼
+┌───────────────────────┐         ┌─────────────────────────────┐
+│  STREAM LAYER         │         │  DISPLAY LAYER              │
+│                       │         │                             │
+│  rdw-relay (Go/bash)  │         │  user formatters (any lang) │
+│  stdin → socket       │         │  per-line, KV-injected      │
+│  pure transport       │         │  HTML or text output        │
+│                       │         │                             │
+│  composed in shell:   │         │  rdw-fmt-json (bash/python) │
+│  prog | fmt | relay   │         │  rdw-fmt-csv  (bash/awk)    │
+└───────────────────────┘         │  rdw-fmt-md   (pandoc)      │
+                                  └─────────────────────────────┘
+</code></pre>
+<h1>[5] Every box above is independently runnable. A user who only needs the</h1>
+<h1>relay and KV store does not need the layout server. A user who only needs</h1>
+<h1>the layout server does not need the KV store.</h1>
+<h1>[6] The server is the only mandatory process. Everything else is optional</h1>
+<h1>composition. This is exactly the Unix model.</h1>
+<hr>
+<h2>Component 1 — rdw-server (Go)</h2>
+<h3>What it is</h3>
+<p>The minimal persistent process. It manages:</p>
+<ul><li>window/pane session state</li>
+<li>WebSocket connections to browsers</li>
+<li>the REST API surface</li>
+<li>auth (token + Unix socket)</li>
+<li>the KV store</li>
+</ul>
+<h3>What it is NOT</h3>
+<h1>[7] rdw-server does not run formatters. It does not store scrollback. It does</h1>
+<h1>not filter lines. It does not mirror streams. It does not manage tokens in any</h1>
+<h1>way beyond checking them. These are other programs&#39; concerns.</h1>
+<h1>[8] rdw-server&#39;s job is: receive a line on a socket, broadcast it to browsers</h1>
+<h1>watching that pane. That is it. Everything else is the user&#39;s pipeline.</h1>
+<h3>Internal structure</h3>
+<pre><code class="language-go">// rdw-server exposes three sub-services, each independently testable.
+// They share a process but nothing else — no shared global state.
+
+type LayoutServer struct {
+    // Windows, panes, groups. Pure session geometry.
+    // Broadcasts layout_update over WebSocket on every mutation.
+    // Knows nothing about line content.
+}
+
+type KVServer struct {
+    // Key-value store with SQLite persistence option.
+    // Emits kv_update WebSocket events on change.
+    // Knows nothing about panes or lines.
+}
+
+type StreamHub struct {
+    // Receives lines on POST /api/v1/stream/{id}
+    // Broadcasts to WebSocket clients watching that pane.
+    // Applies per-pane formatter if registered (calls external command).
+    // Knows nothing about session geometry.
+}
+</code></pre>
+<h1>[9] The three sub-services are separate Go packages with no imports between</h1>
+<h1>them. They are wired together only in main.go. This enforces separation and</h1>
+<h1>makes each testable without the others.</h1>
+<h1>[10] LayoutServer is stateful but has no I/O. KVServer has I/O (SQLite) but</h1>
+<h1>is single-purpose. StreamHub has I/O (sockets, WebSocket) but no state.</h1>
+<h1>Each maps cleanly to a Unix daemon that does one thing.</h1>
+<h3>REST API surface (reduced)</h3>
+<h1>[11] The current rdw has 50+ REST endpoints. The rewrite targets ~20.</h1>
+<h1>The difference is removed by moving functionality to the shell pipeline</h1>
+<h1>or to optional extension daemons.</h1>
+<p><strong>Keep (core):</strong></p>
+<pre><code>GET  /api/v1/ping
+GET  /api/v1/ws                       WebSocket upgrade
+POST /api/v1/stream/{id}              line ingest
+GET  /api/v1/session                  session snapshot
+GET  /api/v1/windows                  list windows
+POST /api/v1/windows                  create window
+DEL  /api/v1/windows/{name}
+PATCH /api/v1/windows/{name}          rename
+POST /api/v1/windows/{name}/focus
+POST /api/v1/panes/{id}/split
+POST /api/v1/panes/{id}/zoom
+POST /api/v1/panes/{id}/resize
+DEL  /api/v1/panes/{id}
+PATCH /api/v1/panes/{id}              set title
+GET  /api/v1/kv                       list keys
+GET  /api/v1/kv/{key}
+PUT  /api/v1/kv/{key}
+DEL  /api/v1/kv/{key}
+GET  /api/v1/layouts
+POST /api/v1/layouts
+POST /api/v1/layouts/{name}/apply
+GET  /api/v1/status
+GET  /api/v1/status/panes/{id}
+</code></pre>
+<p><strong>Remove (moved to shell/pipeline):</strong></p>
+<pre><code>POST /api/v1/panes/{id}/filters       → shell: prog | filter | relay
+POST /api/v1/panes/{id}/format        → shell: relay runs formatter per-line
+POST /api/v1/panes/{id}/bookmarks     → removed with scrollback
+GET  /api/v1/highlights               → moved to user formatter
+POST /api/v1/formatters               → user registers via KV or config file
+POST /api/v1/export/*                 → removed; use tee
+POST /api/v1/cycle/*                  → standalone rdw-cycle daemon
+POST /api/v1/panes/{id}/terminal      → standalone rdw-terminal daemon
+GET  /api/v1/tokens (management)      → rdw-auth daemon or config file
+</code></pre>
+<h1>[12] Removing 30 endpoints is not a loss of functionality. It is a transfer</h1>
+<h1>of responsibility to the correct layer. Every removed endpoint has a simpler</h1>
+<h1>shell equivalent.</h1>
+<h1>[13] The REST API becomes a stable, versioned contract at /api/v1/. Extension</h1>
+<h1>daemons (cycle, terminal, auth) speak the same API. A user writing a custom</h1>
+<h1>extension knows exactly what calls are available.</h1>
+<h3>Making the server more Unix-like</h3>
+<h1>[14] REST is not Unix. Unix tools communicate over pipes and files, not HTTP.</h1>
+<h1>But for a browser-integrated tool, HTTP is unavoidable. The Unix principle</h1>
+<h1>to apply here is: make every operation idempotent, composable via scripts,</h1>
+<h1>and auditable via logs.</h1>
+<h1>[15] Every REST endpoint is also available as a named Unix socket command.</h1>
+<h1>The socket accepts the same JSON as the HTTP API. This means <code>socat</code> or</h1>
+<h1><code>nc</code> can drive rdw-server from the shell without curl.</h1>
+<h1>[16] Events (layout changes, KV changes, new lines) are published as</h1>
+<h1>newline-delimited JSON on a named pipe: /run/rdw/{id}/events. Any</h1>
+<h1>Unix tool can subscribe: <code>tail -f /run/rdw/{id}/events | jq .</code></h1>
+<pre><code class="language-sh"># Subscribe to all rdw events from the shell
+tail -f /run/rdw/default/events | while IFS= read -r event; do
+  type=$(echo &#34;$event&#34; | jq -r .type)
+  case &#34;$type&#34; in
+    kv_update) echo &#34;KV changed: $(echo $event | jq -r .key)&#34; ;;
+    layout_update) echo &#34;Layout changed&#34; ;;
+  esac
+done
+</code></pre>
+<h1>[17] This is more Unix than a WebSocket subscription. WebSockets require a</h1>
+<h1>WebSocket client. <code>tail -f</code> requires nothing. Both the event pipe and the</h1>
+<h1>WebSocket are offered; they carry the same events.</h1>
+<hr>
+<h2>Component 2 — rdw-relay (Go, ~100 lines)</h2>
+<h3>What it is</h3>
+<p>A single-purpose binary: read stdin, send lines to rdw-server.</p>
+<pre><code class="language-go">// rdw-relay reads stdin line by line and sends each to the server.
+// It has exactly three flags: --id, --port, --token.
+// Nothing else.
+func main() {
+    id   := flag.String(&#34;id&#34;, &#34;&#34;, &#34;target pane&#34;)
+    port := flag.Int(&#34;port&#34;, 7681, &#34;server port&#34;)
+    tok  := flag.String(&#34;token&#34;, &#34;&#34;, &#34;auth token&#34;)
+    flag.Parse()
+    relay(os.Stdin, *id, *port, *tok)
+}
+</code></pre>
+<h1>[18] rdw-relay is so simple it could be a bash function. The Go binary is</h1>
+<h1>provided for performance (no shell overhead per line) but a bash equivalent</h1>
+<h1>works identically:</h1>
+<pre><code class="language-sh"># rdw-relay.sh — the entire relay in bash
+rdw_relay() {
+  local id=$1 port=${2:-7681}
+  while IFS= read -r line; do
+    curl -sf -X POST &#34;http://127.0.0.1:$port/api/v1/stream/$id&#34; \
+      -H &#39;Content-Type: application/json&#39; \
+      -d &#34;{\&#34;line\&#34;:$(printf &#39;%s&#39; &#34;$line&#34; | jq -Rs .)}&#34; &gt; /dev/null
+  done
+}
+# Usage: prog | rdw_relay my-pane
+</code></pre>
+<h1>[19] The bash version is slower (one curl per line) but illustrates the</h1>
+<h1>principle: if a tool is so small it can be a shell function, it should not</h1>
+<h1>be a flag on a larger tool. <code>rdw pipe --filter</code> bloats the relay.</h1>
+<h1><code>prog | filter | rdw-relay</code> composes the same result from smaller pieces.</h1>
+<h1>[20] rdw-relay connects via Unix socket first (no token needed for local</h1>
+<h1>owner) and falls back to HTTP. This is the only &#34;smart&#34; behaviour it has.</h1>
+<h1>[21] The reconnect queue stays in rdw-relay: it is a transport concern, not</h1>
+<h1>a pipeline concern. If the server is temporarily unavailable, rdw-relay</h1>
+<h1>buffers N lines and flushes on reconnect. The shell pipeline does not need</h1>
+<h1>to know this happened.</h1>
+<hr>
+<h2>Component 3 — rdw-compose (bash)</h2>
+<h3>What it is</h3>
+<p>This is the key innovation: a bash script that translates rdw-style arguments into shell pipeline composition. It is the answer to the &#34;burden on the user&#34; problem.</p>
+<h1>[22] The user&#39;s burden: instead of <code>rdw pipe --filter &#39;grep ERROR&#39; --id log</code>,</h1>
+<h1>they must write <code>prog | grep ERROR | rdw-relay --id log</code>. For power users this</h1>
+<h1>is natural. For others, it is friction.</h1>
+<h1>[23] rdw-compose eliminates that friction by being the composition engine.</h1>
+<h1>The user writes familiar rdw-style arguments; rdw-compose generates and</h1>
+<h1>executes the correct shell pipeline. No magic, no hidden behaviour — the</h1>
+<h1>generated pipeline is always printed before execution.</h1>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-compose — translate rdw pipe arguments into shell pipeline
+# Usage: rdw-compose [rdw-pipe-flags] [--dry-run]
+
+set -euo pipefail
+
+# [24] Parse arguments in order. Build a pipeline as an array of commands.
+# The user sees the generated pipeline before it runs (--dry-run or always).
+
+declare -a PIPELINE=()
+declare -a BEFORE=()   # commands to run before the pipeline (setup)
+ID=&#34;&#34;
+PORT=7681
+TITLE=&#34;&#34;
+LAYOUT=&#34;&#34;
+FORWARD_FILE=&#34;&#34;
+FORWARD_CMD=&#34;&#34;
+FORWARD_RD=false
+DRY_RUN=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id)         ID=$2;           shift 2 ;;
+    --port)       PORT=$2;         shift 2 ;;
+    --title)      TITLE=$2;        shift 2 ;;
+    --layout)     LAYOUT=$2;       shift 2 ;;
+    --filter)     PIPELINE+=(&#34;$2&#34;); shift 2 ;;
+    --forward-to-file)  FORWARD_FILE=$2; shift 2 ;;
+    --forward-to-cmd)   FORWARD_CMD=$2;  shift 2 ;;
+    --forward)    FORWARD_RD=true; shift ;;
+    --dry-run)    DRY_RUN=true;    shift ;;
+    *)            echo &#34;unknown: $1&#34; &gt;&amp;2; exit 1 ;;
+  esac
+done
+
+# [25] Setup commands run before the pipeline, not in it.
+# These are idempotent: running them twice is safe.
+[[ -n $LAYOUT ]] &amp;&amp; BEFORE+=(&#34;rdw layout apply &#39;$LAYOUT&#39; --port $PORT&#34;)
+[[ -n $TITLE  ]] &amp;&amp; BEFORE+=(&#34;rdw pane rename &#39;$ID&#39; &#39;$TITLE&#39; --port $PORT&#34;)
+
+# [26] Build the pipeline right-to-left. Start from the relay, add stages.
+RELAY=&#34;rdw-relay --id &#39;$ID&#39; --port $PORT&#34;
+
+# [27] Mirroring: tee is the Unix tool for stream duplication.
+# rdw-compose generates the correct tee invocation.
+if [[ -n $FORWARD_FILE &amp;&amp; -n $FORWARD_CMD ]]; then
+  RELAY=&#34;tee &#39;$FORWARD_FILE&#39; &gt;(${FORWARD_CMD}) | $RELAY&#34;
+elif [[ -n $FORWARD_FILE ]]; then
+  RELAY=&#34;tee &#39;$FORWARD_FILE&#39; | $RELAY&#34;
+elif [[ -n $FORWARD_CMD ]]; then
+  RELAY=&#34;tee &gt;($FORWARD_CMD) | $RELAY&#34;
+fi
+
+# [28] Forward to bash-rd: tee is again the right tool.
+$FORWARD_RD &amp;&amp; RELAY=&#34;tee &gt;(rd -c &#39;$ID&#39; 2&gt;/dev/null || true) | $RELAY&#34;
+
+# [29] Filters are just pipeline stages before the relay.
+# They are composed right-to-left: last filter runs last.
+STAGES=&#34;&#34;
+for filter in &#34;${PIPELINE[@]}&#34;; do
+  STAGES=&#34;${STAGES:+$STAGES | }$filter&#34;
+done
+
+FULL_PIPELINE=&#34;${STAGES:+$STAGES | }$RELAY&#34;
+
+# [30] Always show what will run. The user is never surprised.
+echo &#34;# rdw-compose generated pipeline:&#34; &gt;&amp;2
+for cmd in &#34;${BEFORE[@]}&#34;; do echo &#34;#   $cmd&#34; &gt;&amp;2; done
+echo &#34;#   stdin | $FULL_PIPELINE&#34; &gt;&amp;2
+
+$DRY_RUN &amp;&amp; exit 0
+
+# [31] Run setup commands first, then exec the pipeline.
+for cmd in &#34;${BEFORE[@]}&#34;; do eval &#34;$cmd&#34;; done
+exec bash -c &#34;cat | $FULL_PIPELINE&#34;
+</code></pre>
+<h3>Usage examples</h3>
+<pre><code class="language-sh"># Simple pipe — identical to current rdw pipe --id
+prog | rdw-compose --id log
+
+# With filter — generates: prog | grep ERROR | rdw-relay --id log
+prog | rdw-compose --id log --filter &#39;grep ERROR&#39;
+
+# With multiple filters
+prog | rdw-compose --id log \
+  --filter &#39;grep -v DEBUG&#39; \
+  --filter &#39;python3 highlight.py&#39;
+
+# With layout, title, mirroring
+prog | rdw-compose --id build \
+  --title &#34;CI Build&#34; \
+  --layout ci.yaml \
+  --filter &#39;grep -v DEBUG&#39; \
+  --forward-to-file /tmp/build.log
+
+# Dry run: print the pipeline without executing
+prog | rdw-compose --id build --filter &#39;grep ERROR&#39; --dry-run
+# Output:
+# rdw-compose generated pipeline:
+#   stdin | grep ERROR | rdw-relay --id &#39;build&#39; --port 7681
+</code></pre>
+<h1>[32] The dry-run output is itself a valid shell command. The user can copy</h1>
+<h1>it, modify it, and run it directly. rdw-compose is transparent by design.</h1>
+<h1>[33] rdw-compose is not magic. It is a 60-line bash script that generates</h1>
+<h1>shell pipelines. It can be read in two minutes. A user who disagrees with</h1>
+<h1>any generated pipeline can just write the pipeline themselves. There is no</h1>
+<h1>lock-in.</h1>
+<h1>[34] rdw-compose covers 100% of the removed flags from <code>rdw pipe</code>:</h1>
+<h1>--filter, --forward-to-file, --forward-to-cmd, --forward, --layout, --title.</h1>
+<h1>The user experience is identical; the implementation is transparent.</h1>
+<hr>
+<h2>Component 4 — Per-line formatter model</h2>
+<h3>The interface</h3>
+<h1>[35] A formatter in the rewrite is any executable that:</h1>
+<h1>- reads one line from stdin</h1>
+<h1>- writes zero or more lines to stdout</h1>
+<h1>- receives the current KV as environment variables</h1>
+<h1>- writes HTML if registered as an HTML formatter; text otherwise</h1>
+<h1>[36] This is exactly bash-rd&#39;s model. The formatter is the user&#39;s code.</h1>
+<h1>rdw-server calls it; the user writes it.</h1>
+<h3>How rdw-server calls formatters</h3>
+<pre><code class="language-go">// internal/stream/hub.go — simplified
+func (h *Hub) ingestLine(paneID string, rawLine string) {
+    // [37] If a formatter is registered for this pane, call it per-line.
+    // The formatter&#39;s stdout is what gets broadcast to browsers.
+    // If no formatter is registered, broadcast the raw line.
+    if fmt := h.formatters[paneID]; fmt != nil {
+        display, err := fmt.FormatLine(rawLine, h.kv.Snapshot())
+        if err != nil || display == &#34;&#34; {
+            return // formatter dropped the line
+        }
+        h.broadcast(paneID, display)
+        h.ring[paneID].Append(display)
+    } else {
+        h.broadcast(paneID, rawLine)
+        h.ring[paneID].Append(rawLine)
+    }
+}
+</code></pre>
+<h1>[38] The ring buffer stores the formatter&#39;s OUTPUT, not the raw input.</h1>
+<h1>This is important: on reconnect, the browser replays what it would have</h1>
+<h1>seen, not the raw data that needs formatting.</h1>
+<h1>[39] Ring buffer size: 200 lines per pane. Enough for reconnect. Not enough</h1>
+<h1>to be a log store. Users who need log storage use <code>tee</code>.</h1>
+<h3>Formatter registration</h3>
+<pre><code class="language-sh"># Register a per-line text formatter (output replaces the line)
+rdw formatter register log --cmd &#39;python3 highlight.py&#39;
+
+# Register an HTML formatter (output is wrapped in rdw-html div)
+rdw formatter register api --cmd &#39;python3 jsoncolor.py&#39; --html
+
+# Register via KV (no separate command needed)
+rdw kv set fmt.log.cmd  &#39;python3 highlight.py&#39;
+rdw kv set fmt.log.html false
+# rdw-server watches fmt.*.cmd keys and auto-registers formatters
+</code></pre>
+<h1>[40] KV-driven formatter registration is the most Unix-like approach.</h1>
+<h1>The KV store is the configuration channel. Setting a KV key triggers</h1>
+<h1>a side effect (formatter registration) on the server. This is analogous</h1>
+<h1>to how systemd unit files work: write a file, the daemon picks it up.</h1>
+<h1>[41] The formatter is registered once and stays alive between lines</h1>
+<h1>(long-lived mode, for efficiency) OR is called fresh per line (per-line</h1>
+<h1>mode, for KV freshness). The user chooses with a flag. See formatter-model-analysis.md.</h1>
+<h3>Formatter examples</h3>
+<pre><code class="language-python">#!/usr/bin/env python3
+# log-color.py — per-line HTML formatter
+# KV: $LOG_PREFIX is injected from rdw kv set LOG_PREFIX &#34;[PROD]&#34;
+import sys, html, os
+
+prefix = os.environ.get(&#39;LOG_PREFIX&#39;, &#39;&#39;)
+line   = sys.stdin.readline().rstrip()
+
+cls = &#39;err&#39; if &#39;ERROR&#39; in line else &#39;warn&#39; if &#39;WARN&#39; in line else &#39;info&#39;
+print(f&#39;&lt;span class=&#34;{cls}&#34;&gt;{prefix} {html.escape(line)}&lt;/span&gt;&#39;)
+</code></pre>
+<pre><code class="language-sh">#!/bin/sh
+# json-pretty.sh — per-line text formatter using standard jq
+line=$(cat)
+echo &#34;$line&#34; | jq . 2&gt;/dev/null || echo &#34;$line&#34;
+</code></pre>
+<pre><code class="language-awk"># count-errors.awk — stateful formatter (run as long-lived)
+# Counts errors and prepends the running total
+/ERROR/ { errors++ }
+{ print &#34;[errors:&#34; errors &#34;] &#34; $0 }
+</code></pre>
+<h1>[42] The awk formatter is naturally stateful: awk keeps its variables</h1>
+<h1>across lines when run as a long-lived process. No special rdw support needed.</h1>
+<h1><code>--stateful</code> flag keeps the process alive; <code>--per-line</code> (default) restarts it.</h1>
+<h1>[43] The KV injection into formatters is what makes them dynamic. When</h1>
+<h1><code>rdw kv set LOG_PREFIX &#34;[STAGING]&#34;</code> is run mid-stream, the next per-line</h1>
+<h1>invocation picks it up. In long-lived mode, a SIGUSR1 or a re-read of a</h1>
+<h1>temp file is needed — but that is the formatter&#39;s problem, not rdw&#39;s.</h1>
+<hr>
+<h2>Component 5 — rdw-cli (Go, thin REST client)</h2>
+<h3>What it is</h3>
+<h1>[44] rdw-cli is what <code>rdw</code> currently is at the command layer — a thin</h1>
+<h1>wrapper that calls REST endpoints. But in the rewrite it is even thinner:</h1>
+<h1>no local logic, no argument-to-pipeline composition (that is rdw-compose&#39;s job).</h1>
+<h1>Every subcommand maps to exactly one REST call.</h1>
+<pre><code class="language-go">// rdw window create ci  →  POST /api/v1/windows {&#34;name&#34;:&#34;ci&#34;}
+// rdw pane rename log &#34;My Log&#34;  →  PATCH /api/v1/panes/log {&#34;title&#34;:&#34;My Log&#34;}
+// rdw kv set foo bar  →  PUT /api/v1/kv/foo {&#34;value&#34;:&#34;bar&#34;}
+</code></pre>
+<h1>[45] rdw-cli is essentially <code>curl</code> with knowledge of the API schema and</h1>
+<h1>the ability to read the token from config. It could be replaced entirely</h1>
+<h1>by a shell function:</h1>
+<pre><code class="language-sh">rdw() {
+  local token=$(cat ~/.config/rdw/token 2&gt;/dev/null)
+  local base=&#34;http://127.0.0.1:${RDW_PORT:-7681}/api/v1&#34;
+  case &#34;$1 $2&#34; in
+    &#34;window create&#34;) curl -sf -X POST &#34;$base/windows&#34; \
+                       -H &#34;Authorization: Bearer $token&#34; \
+                       -d &#34;{\&#34;name\&#34;:\&#34;$3\&#34;}&#34; ;;
+    &#34;kv set&#34;)        curl -sf -X PUT &#34;$base/kv/$3&#34; \
+                       -H &#34;Authorization: Bearer $token&#34; \
+                       -d &#34;{\&#34;value\&#34;:\&#34;$4\&#34;}&#34; ;;
+    # ...
+  esac
+}
+</code></pre>
+<h1>[46] A bash rdw-cli is an interesting thought experiment. It would require</h1>
+<h1>no compilation, be readable by any Unix user, and be trivially extensible.</h1>
+<h1>The downside: no tab completion, no structured error messages, slower.</h1>
+<h1>Go rdw-cli is the right choice but the bash version should work identically</h1>
+<h1>for scripting purposes.</h1>
+<h1>[47] rdw-cli should support <code>--output json</code> to get raw JSON from any endpoint.</h1>
+<h1>This makes it composable with <code>jq</code>:</h1>
+<h1>rdw status --output json | jq &#39;.panes | keys[]&#39;</h1>
+<h1>rdw kv list --output json | jq &#39;.keys[]&#39;</h1>
+<hr>
+<h2>Dynamism in the rewrite</h2>
+<h1>[48] &#34;rdw is dynamic&#34; means: a running rdw session can be reconfigured</h1>
+<h1>without restart. Windows created, panes split, formatters changed, KV</h1>
+<h1>updated — all while streams are flowing. The rewrite must preserve this.</h1>
+<h3>Dynamic reconfiguration mechanisms</h3>
+<p><strong>1. REST API (same as current):</strong></p>
+<h1>[49] The REST API is the primary dynamic interface. Any tool that can make</h1>
+<h1>HTTP requests can reconfigure a running rdw session. This is already Unix-</h1>
+<h1>compatible via curl. The rewrite makes it more accessible by reducing the</h1>
+<h1>API surface to ~20 well-named endpoints.</h1>
+<p><strong>2. KV-as-configuration:</strong></p>
+<h1>[50] In the rewrite, KV is not just data — it is the primary configuration</h1>
+<h1>channel. Formatter registration, pane titles, highlight rules, and display</h1>
+<h1>preferences are all KV keys. The server watches specific key patterns and</h1>
+<h1>reacts to changes:</h1>
+<pre><code class="language-sh"># Set formatter by writing to KV — no separate API call
+rdw kv set fmt.log.cmd   &#39;python3 highlight.py&#39;
+rdw kv set fmt.log.html  true
+rdw kv set pane.log.title &#34;Application Log&#34;
+
+# Highlight rules as KV
+rdw kv set hl.errors.pattern &#39;ERROR&#39;
+rdw kv set hl.errors.class   &#39;hl-error&#39;
+</code></pre>
+<h1>[51] KV-as-configuration means a formatter script can reconfigure rdw</h1>
+<h1>by writing to KV: <code>echo &#34;=:pane.log.title=Error Storm&#34; | rdw-relay --id log</code>.</h1>
+<h1>The producer controls its own display metadata. This is the bash-rd model.</h1>
+<h1>[52] The server watches key prefixes (<code>fmt.</code>, <code>pane.</code>, <code>hl.</code>) and treats</h1>
+<h1>writes to those keys as configuration mutations. This is analogous to how</h1>
+<h1>procfs works: write to a file, the kernel changes behaviour.</h1>
+<p><strong>3. Event pipe (new):</strong></p>
+<h1>[53] A named pipe at <code>/run/rdw/{id}/events</code> streams all server events as</h1>
+<h1>newline-delimited JSON. External daemons can subscribe and react:</h1>
+<pre><code class="language-sh"># rdw-cycle: external daemon that reads events and drives window focus
+tail -f /run/rdw/default/events \
+  | grep &#39;&#34;type&#34;:&#34;layout_update&#34;&#39; \
+  | rdw-cycle --windows build,logs,metrics --interval 10
+</code></pre>
+<h1>[54] The event pipe makes rdw observable from the shell without a WebSocket</h1>
+<h1>client. Automation scripts can react to rdw state changes using standard</h1>
+<h1>shell tools (grep, jq, awk) without any rdw-specific knowledge.</h1>
+<p><strong>4. Unix socket commands:</strong></p>
+<h1>[55] The Unix socket at <code>/run/rdw/{id}/rdw.sock</code> accepts JSON commands,</h1>
+<h1>one per line. Any tool can drive rdw without HTTP:</h1>
+<pre><code class="language-sh">echo &#39;{&#34;action&#34;:&#34;kv_set&#34;,&#34;key&#34;:&#34;status&#34;,&#34;value&#34;:&#34;running&#34;}&#39; \
+  | socat - UNIX-CONNECT:/run/rdw/default/rdw.sock
+</code></pre>
+<h1>[56] This makes rdw drivable from environments without a full HTTP stack —</h1>
+<h1>embedded systems, minimal containers, or latency-sensitive tools where</h1>
+<h1>HTTP overhead matters.</h1>
+<hr>
+<h2>Making REST more Unix-like</h2>
+<h1>[57] REST is inherently verb-oriented (GET/POST/PATCH/DELETE) rather than</h1>
+<h1>data-flow-oriented (stdin → stdout). But it can be made more Unix-like</h1>
+<h1>by following these principles.</h1>
+<h3>Principle 1: every resource is a file</h3>
+<h1>[58] The KV store is a filesystem. <code>PUT /api/v1/kv/foo</code> is <code>write(foo)</code>.</h1>
+<h1><code>GET /api/v1/kv/foo</code> is <code>read(foo)</code>. This maps directly to a FUSE</h1>
+<h1>filesystem: mount rdw-server as a directory and use standard file operations.</h1>
+<pre><code class="language-sh"># With rdw-fuse (hypothetical optional component):
+cat /mnt/rdw/kv/build.status       # GET /api/v1/kv/build.status
+echo &#34;passing&#34; &gt; /mnt/rdw/kv/build.status  # PUT /api/v1/kv/build.status
+ls /mnt/rdw/panes/                  # GET /api/v1/session
+echo &#34;hello&#34; &gt;&gt; /mnt/rdw/stream/log # POST /api/v1/stream/log
+</code></pre>
+<h1>[59] A FUSE mount is an optional component, not core. But offering it makes</h1>
+<h1>rdw accessible to any Unix tool that can read and write files — which is</h1>
+<h1>every Unix tool. Standard <code>cp</code>, <code>cat</code>, <code>echo</code>, <code>find</code> all become rdw clients.</h1>
+<h1>[60] The FUSE mount is read-write for KV, write-only for streams, and</h1>
+<h1>read-only for status. It maps the REST API onto file semantics exactly.</h1>
+<h3>Principle 2: idempotency</h3>
+<h1>[61] Every REST endpoint in the rewrite is idempotent. PUT replaces, PATCH</h1>
+<h1>modifies, POST creates-or-gets. There are no &#34;create-only&#34; operations that</h1>
+<h1>fail if the resource already exists. This makes scripting safe: a setup</h1>
+<h1>script can be run twice without error.</h1>
+<h3>Principle 3: composability via shell</h3>
+<h1>[62] Every REST operation should be expressible as a one-liner with curl.</h1>
+<h1>The rdw-cli is a convenience; it should never be required. Documentation</h1>
+<h1>always shows the curl equivalent alongside the rdw-cli command.</h1>
+<pre><code class="language-sh"># rdw-cli and curl equivalents side by side:
+rdw kv set foo bar
+curl -X PUT http://localhost:7681/api/v1/kv/foo -d &#39;{&#34;value&#34;:&#34;bar&#34;}&#39;
+
+rdw window create build
+curl -X POST http://localhost:7681/api/v1/windows -d &#39;{&#34;name&#34;:&#34;build&#34;}&#39;
+</code></pre>
+<h3>Principle 4: the server emits events, not commands</h3>
+<h1>[63] The WebSocket carries events (things that happened) not commands</h1>
+<h1>(things to do). The browser decides what to do with an event. This is</h1>
+<h1>the Unix pub-sub model: the server publishes, consumers subscribe.</h1>
+<h1>No consumer is forced to handle any event.</h1>
+<h1>[64] Events are named nouns: <code>window.created</code>, <code>kv.changed</code>, <code>line.received</code>.</h1>
+<h1>Not verbs like <code>update_display</code> or <code>refresh_layout</code>. The distinction matters</h1>
+<h1>for composability: a consumer that only cares about KV changes subscribes</h1>
+<h1>to <code>kv.changed</code> and ignores everything else.</h1>
+<hr>
+<h2>The scrollback question in the rewrite</h2>
+<h1>[65] The rewrite replaces the scrollback buffer with a ring buffer of 200</h1>
+<h1>display lines per pane. This is the display cache; it is not a data store.</h1>
+<h1>[66] A user who needs scrollback history uses <code>tee</code>:</h1>
+<h1>prog | tee ~/.rdw-logs/build.log | rdw-relay --id build</h1>
+<h1>Standard Unix log rotation (logrotate) then manages the file.</h1>
+<h1>[67] Export disappears from rdw entirely. The &#34;export&#34; is the tee&#39;d file.</h1>
+<h1><code>rdw save</code> becomes <code>cat ~/.rdw-logs/build.log | markdown_formatter</code>.</h1>
+<h1>No rdw involvement needed.</h1>
+<h1>[68] The ring buffer is used only for reconnect replay. When a browser</h1>
+<h1>reconnects, it receives the last 200 display lines. This gives a useful</h1>
+<h1>&#34;catch up&#34; without committing to full log storage.</h1>
+<h1>[69] 200 lines is configurable per server start: <code>rdw-server --ring-size 500</code>.</h1>
+<h1>It is not configurable per pane — all panes in a session share the same ring</h1>
+<h1>size. This simplifies the model.</h1>
+<hr>
+<h2>Breaking rdw into composable utilities</h2>
+<h3>rdw-server (Go, ~1000 lines)</h3>
+<h1>[70] The core: session geometry, KV store, WebSocket hub, formatter</h1>
+<h1>runner, ring buffer, REST API, auth. ~20 endpoints.</h1>
+<h3>rdw-relay (Go, ~100 lines OR bash ~20 lines)</h3>
+<h1>[71] stdin → server. Three flags: --id, --port, --token.</h1>
+<h1>The simplest possible transport. Could be a curl one-liner.</h1>
+<h3>rdw-compose (bash, ~100 lines)</h3>
+<h1>[72] Argument-to-pipeline compiler. Translates rdw-pipe-style arguments</h1>
+<h1>into shell pipelines. Always shows the generated pipeline. Dry-run mode.</h1>
+<h3>rdw-fuse (Go, optional, ~500 lines)</h3>
+<h1>[73] Mounts the rdw API as a filesystem. Optional; not needed for basic use.</h1>
+<h1>Enables any Unix tool to interact with rdw without knowing its API.</h1>
+<h3>rdw-cycle (bash, ~30 lines)</h3>
+<h1>[74] Focus cycle daemon. Reads the event pipe, rotates window focus.</h1>
+<h1>Currently an rdw-server feature; in the rewrite it is an independent process:</h1>
+<pre><code class="language-sh">#!/bin/sh
+# rdw-cycle -- rotate focus through windows at N second intervals
+windows=&#34;$1&#34;  # comma-separated
+interval=&#34;${2:-5}&#34;
+IFS=, read -ra WINS &lt;&lt;&lt; &#34;$windows&#34;
+i=0
+while true; do
+  rdw window focus &#34;${WINS[$i]}&#34;
+  i=$(( (i + 1) % ${#WINS[@]} ))
+  sleep &#34;$interval&#34;
+done
+</code></pre>
+<h1>[75] rdw-cycle is 10 lines of shell. It does not need to be in rdw-server.</h1>
+<h1>It talks to rdw via rdw-cli (one REST call per focus change). It runs as</h1>
+<h1>a background process the user starts and stops manually.</h1>
+<h3>rdw-fmt-* (bash/python, ~20-50 lines each)</h3>
+<h1>[76] A collection of example formatters shipped with rdw. These are scripts,</h1>
+<h1>not compiled code. Users copy and modify them.</h1>
+<pre><code>rdw-fmt-json     -- jq pretty-print + colour (uses jq + sed)
+rdw-fmt-csv      -- CSV to HTML table (uses awk or python csv module)
+rdw-fmt-ansi     -- ANSI colour passthrough (default; trivial)
+rdw-fmt-errors   -- highlight errors and warnings (uses grep + sed)
+rdw-fmt-count    -- running line count in header (uses awk)
+rdw-fmt-ts       -- prepend timestamp (uses ts from moreutils or date)
+</code></pre>
+<h1>[77] These formatters are pedagogical as much as functional. A user who</h1>
+<h1>reads rdw-fmt-json understands how to write their own. The code is 20 lines.</h1>
+<h1>Nothing is hidden in compiled binary code.</h1>
+<h3>rdw-kv-watch (bash, ~20 lines)</h3>
+<h1>[78] Polls a KV key and triggers a command when the value changes.</h1>
+<h1>Replaces the proposed KV change notification WebSocket feature.</h1>
+<pre><code class="language-sh">#!/bin/sh
+# rdw-kv-watch KEY CMD -- run CMD when KEY changes
+key=$1; cmd=$2; prev=&#34;&#34;
+while true; do
+  cur=$(rdw kv get &#34;$key&#34; 2&gt;/dev/null)
+  [ &#34;$cur&#34; != &#34;$prev&#34; ] &amp;&amp; { prev=$cur; eval &#34;$cmd&#34;; }
+  sleep 1
+done
+</code></pre>
+<h1>[79] rdw-kv-watch is a polling loop. It is not elegant but it is Unix:</h1>
+<h1>any user can understand it, modify it, and extend it. A WebSocket subscription</h1>
+<h1>would be more efficient but would require a WebSocket client library.</h1>
+<h3>rdw-auth (bash, optional)</h3>
+<h1>[80] Token management as a shell script. Reads/writes ~/.config/rdw/tokens.</h1>
+<h1>In the rewrite, token auth is optional for local use (Unix socket covers it).</h1>
+<hr>
+<h2>The composition interface — how it works for users</h2>
+<h1>[81] The user experience question: if filtering is <code>prog | filter | rdw-relay</code>,</h1>
+<h1>do users need to learn three tools instead of one? The answer is no,</h1>
+<h1>because rdw-compose handles the composition. Users write rdw-style flags;</h1>
+<h1>rdw-compose generates the pipeline. Advanced users skip rdw-compose entirely.</h1>
+<h3>Three levels of use</h3>
+<p><strong>Level 1 — casual user (identical to current rdw):</strong></p>
+<pre><code class="language-sh">prog | rdw-compose --id log --filter &#39;grep ERROR&#39; --title &#34;App Log&#34;
+</code></pre>
+<p>Same interface as today. rdw-compose generates the pipeline invisibly.</p>
+<p><strong>Level 2 — intermediate user (reads the generated pipeline):</strong></p>
+<pre><code class="language-sh"># --dry-run shows the pipeline
+prog | rdw-compose --id log --filter &#39;grep ERROR&#39; --dry-run
+# # rdw-compose generated pipeline:
+# #   stdin | grep ERROR | rdw-relay --id &#39;log&#39; --port 7681
+
+# User copies and modifies:
+prog | grep ERROR | sed &#39;s/ERROR/[ERR]/&#39; | rdw-relay --id log
+</code></pre>
+<h1>[82] The dry-run output is the escape hatch. The user who wants full control</h1>
+<h1>runs with --dry-run, copies the pipeline, modifies it, and never uses</h1>
+<h1>rdw-compose again. No lock-in.</h1>
+<p><strong>Level 3 — power user (no rdw-compose at all):</strong></p>
+<pre><code class="language-sh">prog \
+  | grep ERROR \
+  | python3 highlight.py \
+  | tee /tmp/errors.log \
+  | rdw-relay --id log
+</code></pre>
+<h1>[83] Level 3 users discover that rdw-relay is trivially replaceable.</h1>
+<h1>They might replace it with a curl one-liner, a socat command, or their</h1>
+<h1>own relay. The server does not care how lines arrive.</h1>
+<hr>
+<h2>Handling rdw&#39;s many arguments</h2>
+<h3>The problem stated precisely</h3>
+<h1>[84] rdw pipe currently has ~12 flags. Shell composition requires the user</h1>
+<h1>to know <code>tee</code>, process substitution, shell pipelines, and multiple rdw-cli</h1>
+<h1>commands. For a developer unfamiliar with advanced bash, this is hostile.</h1>
+<h1>[85] The solution is not to embed this knowledge in rdw. It is to provide</h1>
+<h1>rdw-compose as a learning aid that shows users what the shell pipeline looks</h1>
+<h1>like. Over time, users learn the underlying tools and stop needing rdw-compose.</h1>
+<h1>This is the Unix education model: tools that teach the user to not need them.</h1>
+<h3>rdw-compose as a teaching tool</h3>
+<h1>[86] rdw-compose ALWAYS prints the generated pipeline to stderr before</h1>
+<h1>running it. This is intentional and not suppressible. The user always sees</h1>
+<h1>what is happening. This is transparency as a design principle, not a debug mode.</h1>
+<h1>[87] The pipeline output is syntax-highlighted if the terminal supports it.</h1>
+<h1>The command boundary (<code>|</code>) is highlighted differently from arguments.</h1>
+<h1>This makes it easier to read and understand for new users.</h1>
+<h3>Argument profiles (named compositions)</h3>
+<h1>[88] A user can save a composition as a named profile:</h1>
+<pre><code class="language-sh"># Save a composition profile
+rdw-compose --id log \
+  --filter &#39;grep -v DEBUG&#39; \
+  --title &#34;Application Log&#34; \
+  --forward-to-file /tmp/app.log \
+  --save-as myapp-log
+
+# Use it later
+prog | rdw-compose @myapp-log
+</code></pre>
+<h1>[89] Profiles are stored as shell scripts in ~/.config/rdw/profiles/.</h1>
+<h1>A profile is just the generated pipeline as a shell function:</h1>
+<pre><code class="language-sh"># ~/.config/rdw/profiles/myapp-log.sh
+myapp_log() {
+  rdw pane rename log &#34;Application Log&#34; --port 7681
+  cat | grep -v DEBUG | tee /tmp/app.log | rdw-relay --id log --port 7681
+}
+</code></pre>
+<h1>[90] Because profiles are shell scripts, they can be shared, version-</h1>
+<h1>controlled, and modified without any rdw knowledge. They are not a</h1>
+<h1>proprietary format. <code>cat ~/.config/rdw/profiles/myapp-log.sh</code> shows</h1>
+<h1>everything.</h1>
+<hr>
+<h2>What stays in Go, what moves to bash</h2>
+<h1>[91] Go handles: anything that needs performance (relay buffering,</h1>
+<h1>WebSocket broadcasting, KV store access, HTTP serving), anything that</h1>
+<h1>needs structured error handling, anything that needs to be a stable binary.</h1>
+<h1>[92] Bash handles: anything that is composition of existing tools</h1>
+<h1>(rdw-compose, rdw-cycle, rdw-kv-watch, example formatters), anything</h1>
+<h1>that benefits from being readable and modifiable, anything where</h1>
+<h1>startup time does not matter.</h1>
+<table>
+<tr><th>Component</th><th>Language</th><th>Reason</th></tr>
+<tr><td>rdw-server</td><td>Go</td><td>Performance, WebSocket, HTTP, SQLite</td></tr>
+<tr><td>rdw-relay</td><td>Go</td><td>Per-line throughput, reconnect buffer</td></tr>
+<tr><td>rdw-cli</td><td>Go</td><td>Structured errors, tab completion, token management</td></tr>
+<tr><td>rdw-compose</td><td>bash</td><td>Composition, transparency, modifiability</td></tr>
+<tr><td>rdw-cycle</td><td>bash</td><td>Trivial; 10 lines of shell</td></tr>
+<tr><td>rdw-kv-watch</td><td>bash</td><td>Trivial; polling loop</td></tr>
+<tr><td>rdw-fuse</td><td>Go</td><td>FUSE requires Go/C</td></tr>
+<tr><td>rdw-fmt-*</td><td>bash/python</td><td>Pedagogy; users copy and modify</td></tr>
+</table>
+<h1>[93] The binary count goes from 1 to 3 (server, relay, cli). Everything</h1>
+<h1>else is a shell script. The total compiled code drops from ~8000 lines to</h1>
+<h1>~2000 lines. The rest is shell scripts that any Unix user can read and modify.</h1>
+<hr>
+<h2>Migration path</h2>
+<h1>[94] The rewrite is not a forced migration. rdw 1.x continues to work.</h1>
+<h1>rdw 2.x ships both the new components and a compatibility shim:</h1>
+<h1><code>rdw pipe</code> in 2.x calls rdw-compose internally.</h1>
+<h1>[95] Deprecated features emit warnings that show the replacement:</h1>
+<h1>rdw pipe --filter &#39;grep ERROR&#39; --id log</h1>
+<h1>Warning: --filter is deprecated. Use: prog | grep ERROR | rdw-relay --id log</h1>
+<h1>Or install rdw-compose: prog | rdw-compose --id log --filter &#39;grep ERROR&#39;</h1>
+<h1>[96] The deprecation warning is informational, not blocking. The flag still</h1>
+<h1>works in 2.x. Removal happens in 3.0 with a minimum 12-month warning period.</h1>
+<h1>[97] The scrollback buffer deprecation is harder. Users who depend on</h1>
+<h1><code>rdw save</code> or bookmarks need a migration path. The migration is:</h1>
+<h1>Old: prog | rdw pipe --id log  (rdw stores lines)</h1>
+<h1>New: prog | tee ~/.rdw/logs/log.txt | rdw-relay --id log  (you store lines)</h1>
+<h1>This is a one-line change to the pipeline.</h1>
+<h1>[98] The migration guide ships as a man page (rdw-migrate.7) with before/after</h1>
+<h1>examples for every deprecated feature. Nothing is removed without documentation.</h1>
+<hr>
+<h2>Summary: what the rewrite achieves</h2>
+<h1>[99] The rewrite makes rdw a set of tools, not a tool. Each component does</h1>
+<h1>one thing. They compose via Unix pipes, REST calls, and shell scripts. A</h1>
+<h1>user who dislikes any component can replace it. A user who only needs part</h1>
+<h1>of rdw can use just that part.</h1>
+<h1>[100] The most important change: formatters move out of rdw-server and into</h1>
+<h1>the user&#39;s shell. rdw-server goes back to what bash-rd always was at its</h1>
+<h1>core — a conduit between a process and a browser, with a hook for the user&#39;s</h1>
+<h1>display code. Everything else is composition.</h1>
+<hr>
+<h2>Component dependency graph</h2>
+<pre><code>rdw-compose (bash)
+  └── generates shell pipeline using:
+        ├── any filter command (grep, awk, sed, python3, ...)
+        └── rdw-relay (Go)
+              └── rdw-server (Go)
+                    ├── rdw-kv (embedded, REST)
+                    ├── rdw-layout (embedded, REST)
+                    └── rdw-ws-hub (embedded, WebSocket)
+                          └── browser SPA or custom frontend
+
+rdw-cli (Go) ──────────── rdw-server (REST)
+rdw-cycle (bash) ────────── rdw-cli
+rdw-kv-watch (bash) ──────── rdw-cli
+rdw-fuse (Go, optional) ───── rdw-server (REST)
+user formatters (any) ──── called by rdw-server per line
+</code></pre>
+<p>Every arrow is either a REST call, a shell pipe, or a Unix socket command. Nothing is a function call across component boundaries at runtime.</p>
+
+<div id="nav-bar"><a href="functionality-inventory.html">← Functionality Inventory</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>
