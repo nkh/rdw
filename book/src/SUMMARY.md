@@ -54,4 +54,5 @@
 - [Formatter Model Analysis](dev/formatter-model-analysis.md)
 - [Functionality Inventory](dev/functionality-inventory.md)
 - [Rewrite Architecture](dev/rewrite-architecture.md)
+- [Bash/Perl Architecture](dev/bash-perl-architecture.md)
 - [Worklog](dev/worklog.md)

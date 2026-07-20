@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bash/Perl Architecture — rdw</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       background: #1a1a2e; color: #c0c0d0; display: flex; min-height: 100vh; }
+#sidebar { width: 260px; min-height: 100vh; background: #12121f; padding: 20px 0;
+           position: fixed; top: 0; left: 0; overflow-y: auto; border-right: 1px solid #2a2a3e; }
+#sidebar h1 { font-size: 14px; font-weight: 700; color: #fff; padding: 0 20px 16px;
+              border-bottom: 1px solid #2a2a3e; letter-spacing: .5px; }
+#sidebar ul { list-style: none; padding: 8px 0; }
+#sidebar li a { display: block; padding: 5px 20px; color: #9090b0; text-decoration: none;
+                font-size: 13px; border-left: 3px solid transparent; }
+#sidebar li a:hover, #sidebar li a.active { color: #e0e0f0; background: #1e1e32;
+                                             border-left-color: #6060c0; }
+#sidebar li.section { padding: 12px 20px 4px; font-size: 11px; font-weight: 700;
+                       color: #4a4a6a; text-transform: uppercase; letter-spacing: 1px; }
+#content { margin-left: 260px; padding: 40px 60px; max-width: 900px; width: 100%; }
+h1 { font-size: 28px; color: #e0e0ff; margin-bottom: 24px; padding-bottom: 12px;
+     border-bottom: 1px solid #2a2a3e; }
+h2 { font-size: 20px; color: #c0c0e0; margin: 32px 0 12px; }
+h3 { font-size: 16px; color: #a0a0d0; margin: 24px 0 8px; }
+h4 { font-size: 14px; color: #9090c0; margin: 16px 0 6px; }
+p  { margin-bottom: 14px; }
+a  { color: #8080ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: #1e1e32; color: #c0e0c0; padding: 1px 5px; border-radius: 3px;
+       font: 13px "JetBrains Mono", "Fira Code", monospace; }
+pre  { background: #0e0e1c; border: 1px solid #2a2a3e; border-radius: 6px;
+       padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+pre code { background: none; padding: 0; color: #b0d0b0; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+th { background: #1e1e32; color: #a0a0d0; text-align: left; padding: 8px 12px;
+     border: 1px solid #2a2a3e; font-size: 13px; }
+td { padding: 7px 12px; border: 1px solid #2a2a3e; font-size: 13px; }
+tr:nth-child(even) td { background: #16162a; }
+ul, ol { margin: 0 0 14px 24px; }
+li { margin-bottom: 4px; }
+blockquote { border-left: 3px solid #4040a0; padding: 8px 16px; color: #8080a0;
+             margin-bottom: 14px; background: #16162a; }
+hr { border: none; border-top: 1px solid #2a2a3e; margin: 24px 0; }
+#nav-bar { display: flex; justify-content: space-between; margin-top: 40px;
+           padding-top: 16px; border-top: 1px solid #2a2a3e; }
+#nav-bar a { color: #6060c0; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav id="sidebar"><h1>rdw</h1><ul><li class="section">Summary</li><li><a href="../introduction.html">Introduction</a></li><li class="section">Getting Started</li><li><a href="../guide/installation.html">Installation</a></li><li><a href="../guide/quickstart.html">Quick Start</a></li><li><a href="../guide/concepts.html">Concepts</a></li><li class="section">User Guide</li><li><a href="../guide/pipe.html">Piping Output</a></li><li><a href="../guide/titles.html">Pane Titles</a></li><li><a href="../guide/layouts.html">Layouts</a></li><li><a href="../guide/kv.html">Key-Value Store</a></li><li><a href="../guide/filters.html">Filters</a></li><li><a href="../guide/formatters.html">Formatters</a></li><li><a href="../guide/user-formatters.html">User-Defined Formatters</a></li><li><a href="../guide/images.html">Images and SVG</a></li><li><a href="../guide/send.html">Sending Files</a></li><li><a href="../guide/control.html">Control Sequences</a></li><li><a href="../guide/highlights.html">Highlight Profiles</a></li><li><a href="../guide/bookmarks.html">Bookmarks</a></li><li><a href="../guide/auth.html">Authentication</a></li><li><a href="../guide/mirror.html">Stream Mirroring</a></li><li><a href="../guide/cycle.html">Focus Cycle</a></li><li><a href="../guide/status.html">Introspection</a></li><li><a href="../guide/admin.html">Admin Page</a></li><li><a href="../guide/export.html">Export</a></li><li><a href="../guide/multi-server.html">Multiple Servers</a></li><li><a href="../guide/terminal.html">Terminal Panes</a></li><li><a href="../guide/bash-rd.html">bash-rd Compatibility</a></li><li><a href="../guide/ci.html">CI and Headless Use</a></li><li class="section">Reference</li><li><a href="../reference/cli.html">CLI Commands</a></li><li><a href="../reference/control.html">Control Sequences</a></li><li><a href="../reference/api.html">REST API</a></li><li><a href="../reference/websocket.html">WebSocket Protocol</a></li><li><a href="../reference/layout.html">Layout Schema</a></li><li><a href="../reference/config.html">Configuration</a></li><li><a href="../reference/bindings.html">Keyboard Bindings</a></li><li class="section">Development</li><li><a href="architecture.html">Architecture</a></li><li><a href="onboarding.html">Onboarding</a></li><li><a href="code-review.html">Code Review</a></li><li><a href="improvements.html">Improvements</a></li><li><a href="unix-analysis.html">Unix Philosophy Analysis</a></li><li><a href="unix-redesign.html">Unix Redesign Design</a></li><li><a href="formatter-model-analysis.html">Formatter Model Analysis</a></li><li><a href="functionality-inventory.html">Functionality Inventory</a></li><li><a href="rewrite-architecture.html">Rewrite Architecture</a></li><li><a href="bash-perl-architecture.html" class="active">Bash/Perl Architecture</a></li><li><a href="worklog.html">Worklog</a></li></ul></nav>
+<main id="content">
+<h1>rdw rewrite — bash/perl implementation architecture</h1>
+<hr>
+<h2>What we are doing and why</h2>
+<p>This document describes a complete rewrite of rdw using bash and perl instead of Go. Before explaining the components, it is worth being clear about what rdw actually does, so the rewrite choices make sense.</p>
+<p><strong>What rdw does at its core:</strong></p>
+<p>A process writes output to its stdout. A shell pipe connects that stdout to rdw. rdw sends each line of that output to a web server. The web server pushes those lines to a browser over a WebSocket connection. The browser displays them in a named pane inside a window layout. That is the entire core function.</p>
+<p>Everything else — filtering, formatting, authentication, KV store, layout management, export, bookmarks, highlight profiles — is built on top of that core. The Go rewrite packed all of these into one binary. The bash/perl rewrite separates them into independent programs that communicate over Unix pipes, sockets, and files.</p>
+<p><strong>Why bash and perl instead of Go:</strong></p>
+<p>Go is excellent for high-throughput network servers. But rdw is primarily a debugging and introspection tool used by one developer at a time, not a production system serving thousands of requests per second. The overhead of a per-line subprocess (a formatter) or a polling loop (KV watch) is acceptable at the scale rdw operates. In exchange, every component is readable and modifiable by any Unix user without a compiler.</p>
+<p>Perl is chosen (over Python) because it is universally available on Unix systems, has no external dependencies for HTTP and JSON work beyond CPAN modules that ship with most distributions, and is traditionally the language of Unix text processing and CGI — exactly the two things rdw&#39;s server needs.</p>
+<p>Bash is chosen for everything that is composition of existing Unix tools: relaying lines, composing pipelines, cycling windows, watching KV keys.</p>
+<p><strong>What we are keeping:</strong></p>
+<p>All current rdw functionality is accounted for in this document. For each feature we state whether it is kept, simplified, made optional, or removed with a shell equivalent provided.</p>
+<p><strong>The key conceptual shift:</strong></p>
+<p>The Go rdw is one program that does many things. The bash/perl rdw is a collection of small programs that each do one thing and are composed in the shell. The user experience is identical for casual use (rdw-compose handles the composition). For power users, each component is independently useful and replaceable.</p>
+<hr>
+<h2>Tool dependencies</h2>
+<p>The following existing Unix tools are used instead of writing equivalent Go code.</p>
+<table>
+<tr><th>Tool</th><th>Purpose</th><th>Why not write it</th></tr>
+<tr><td><code>websocat</code></td><td>WebSocket client/server from shell</td><td>Eliminates all WS client code</td></tr>
+<tr><td><code>socat</code></td><td>Unix socket relay, TCP relay</td><td>Eliminates socket management code</td></tr>
+<tr><td><code>jq</code></td><td>JSON parsing and generation</td><td>Eliminates all JSON code in bash</td></tr>
+<tr><td><code>perl + HTTP::Daemon</code></td><td>HTTP server</td><td>Ships with perl; no CPAN install</td></tr>
+<tr><td><code>perl + JSON::PP</code></td><td>JSON encoding/decoding</td><td>Ships with perl core since 5.14</td></tr>
+<tr><td><code>perl + DBI + DBD::SQLite</code></td><td>SQLite KV persistence</td><td>Available on most systems</td></tr>
+<tr><td><code>inotifywait</code></td><td>File change detection (Linux)</td><td>Eliminates polling for KV watch</td></tr>
+<tr><td><code>tee</code></td><td>Stream duplication</td><td>Already exists; no mirror module needed</td></tr>
+<tr><td><code>ts</code> (moreutils)</td><td>Timestamp prepend</td><td>Eliminates <code>t:</code> control sequence</td></tr>
+<tr><td><code>base64</code></td><td>Binary encoding</td><td>Eliminates <code>image:end</code> sentinel framing</td></tr>
+<tr><td><code>nc</code> / <code>ncat</code></td><td>TCP line relay fallback</td><td>When socat unavailable</td></tr>
+<tr><td><code>mkfifo</code></td><td>Named pipes for event bus</td><td>Eliminates custom event system</td></tr>
+<tr><td><code>flock</code></td><td>File locking for registry</td><td>Safe concurrent server registry</td></tr>
+<tr><td><code>logrotate</code></td><td>Log management</td><td>Replaces export/scrollback entirely</td></tr>
+<tr><td><code>pandoc</code> / <code>cmark</code></td><td>Markdown rendering</td><td>Replaces built-in markdown formatter</td></tr>
+<tr><td><code>jq</code></td><td>JSON pretty-print</td><td>Replaces built-in json formatter</td></tr>
+<tr><td><code>column</code></td><td>Table formatting</td><td>Replaces built-in csv formatter</td></tr>
+</table>
+<hr>
+<h2>Component overview</h2>
+<pre><code>┌─────────────────────────────────────────────────────────────────────┐
+│  USER INTERFACE                                                     │
+│                                                                     │
+│  rdw          rdw-compose      browser                              │
+│  (bash)       (bash)           SPA (HTML/JS) or custom             │
+│  thin REST    pipeline         served by rdw-server                 │
+│  client       composer                                              │
+└──────┬────────────┬────────────────────────────────────────────────┘
+       │            │
+       ▼            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  rdw-server (perl)                                                  │
+│                                                                     │
+│  HTTP::Daemon  WebSocket hub   Session mgr   KV store               │
+│  REST API      (via websocat)  windows/panes (JSON file +           │
+│  ~20 endpoints event fanout    layout mgmt   optional SQLite)       │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+              ┌────────────────┴───────────────┐
+              ▼                                ▼
+┌─────────────────────┐            ┌───────────────────────┐
+│  rdw-relay (bash)   │            │  user formatters       │
+│  stdin → socket     │            │  bash/perl scripts     │
+│  pure transport     │            │  per-line, KV-injected │
+│  ~30 lines bash     │            │  HTML or text output   │
+└─────────────────────┘            └───────────────────────┘
+</code></pre>
+<hr>
+<h2>Module 1 — rdw-server (perl)</h2>
+<h3>What it is</h3>
+<p>The only persistent process. Written in perl using <code>HTTP::Daemon</code> (ships with perl core) and <code>JSON::PP</code> (ships with perl core since 5.14). websocat handles the WebSocket transport.</p>
+<h3>What it is not</h3>
+<p>rdw-server does not filter lines. It does not store scrollback. It does not run built-in formatters. It does not manage tokens beyond checking them. It does not cycle windows. These are other programs&#39; concerns.</p>
+<h3>Architecture</h3>
+<p>rdw-server is a single perl script that forks into three cooperating processes:</p>
+<pre><code>rdw-server
+  │
+  ├── http_worker (perl, HTTP::Daemon)
+  │     Handles all REST API calls
+  │     Reads/writes session state from shared JSON file
+  │     Reads/writes KV from shared JSON file (or SQLite)
+  │
+  ├── ws_hub (websocat + bash glue)
+  │     websocat --server listens for browser WS connections
+  │     Lines arrive on a named pipe: /run/rdw/ID/stream
+  │     hub_fanout.sh reads the pipe and writes to all WS clients
+  │
+  └── event_bus (named pipes)
+        /run/rdw/ID/events   -- all events as NDJSON
+        /run/rdw/ID/stream   -- line stream for ws_hub
+        /run/rdw/ID/kv       -- KV change events
+</code></pre>
+<h3>The session state file</h3>
+<p>Session state (windows, panes, layout) is stored as a JSON file:</p>
+<pre><code>/run/rdw/ID/session.json
+</code></pre>
+<p>All processes read and write it under <code>flock</code>. This replaces the Go <code>session.Manager</code> struct. Perl&#39;s <code>JSON::PP</code> reads and writes it.</p>
+<pre><code class="language-perl"># read session state
+sub read_session {
+    my $path = &#34;$RDW_RUN/session.json&#34;;
+    open my $fh, &#39;&lt;&#39;, $path or return {windows=&gt;[], active=&gt;0};
+    flock $fh, LOCK_SH;
+    my $data = do { local $/; &lt;$fh&gt; };
+    close $fh;
+    return decode_json($data);
+}
+
+# write session state (exclusive lock)
+sub write_session {
+    my ($state) = @_;
+    my $path = &#34;$RDW_RUN/session.json&#34;;
+    open my $fh, &#39;&gt;&#39;, $path or die &#34;cannot write session: $!&#34;;
+    flock $fh, LOCK_EX;
+    print $fh encode_json($state);
+    close $fh;
+    # Notify watchers via event bus
+    emit_event({type =&gt; &#39;layout_update&#39;, payload =&gt; $state});
+}
+</code></pre>
+<h3>The KV store</h3>
+<p>KV is a JSON file <code>/run/rdw/ID/kv.json</code> with optional SQLite backing.</p>
+<pre><code class="language-perl"># Write a KV pair
+sub kv_set {
+    my ($key, $value) = @_;
+    my $kv = read_kv();
+    $kv-&gt;{$key} = $value;
+    write_kv($kv);
+    emit_event({type =&gt; &#39;kv_update&#39;, key =&gt; $key, value =&gt; $value});
+    # Also write to SQLite if persistence enabled
+    if ($ENV{RDW_KV_PERSIST}) {
+        my $dbh = DBI-&gt;connect(&#34;dbi:SQLite:$ENV{RDW_KV_PERSIST}&#34;);
+        $dbh-&gt;do(&#34;INSERT OR REPLACE INTO kv VALUES (?,?)&#34;, undef, $key, $value);
+    }
+}
+</code></pre>
+<h3>The WebSocket hub</h3>
+<p>websocat provides the WebSocket server. The hub is a bash script that reads from the stream named pipe and writes to all connected clients.</p>
+<pre><code class="language-bash">#!/bin/bash
+# rdw-ws-hub.sh -- fan out lines from stream pipe to WebSocket clients
+# Called by rdw-server after starting websocat
+
+RDW_RUN=${RDW_RUN:-/run/rdw/default}
+CLIENTS_DIR=&#34;$RDW_RUN/clients&#34;
+STREAM=&#34;$RDW_RUN/stream&#34;
+
+mkdir -p &#34;$CLIENTS_DIR&#34;
+mkfifo &#34;$STREAM&#34; 2&gt;/dev/null || true
+
+# websocat in server mode: each connection gets its own pipe in CLIENTS_DIR
+websocat --server &#34;ws://127.0.0.1:${RDW_WS_PORT:-7682}&#34; \
+  --exec-cmd &#34;bash -c &#39;cat &gt; $CLIENTS_DIR/\$\$; trap \&#34;rm -f $CLIENTS_DIR/\$\$\&#34; EXIT; cat&#39;&#34; &amp;
+
+# Fan-out loop: read from stream pipe, write to all client pipes
+while IFS= read -r line; do
+  for client in &#34;$CLIENTS_DIR&#34;/*; do
+    [ -p &#34;$client&#34; ] &amp;&amp; echo &#34;$line&#34; &gt; &#34;$client&#34; 2&gt;/dev/null || true
+  done
+done &lt; &#34;$STREAM&#34;
+</code></pre>
+<h3>The REST API (perl HTTP::Daemon)</h3>
+<pre><code class="language-perl">#!/usr/bin/env perl
+use strict; use warnings;
+use HTTP::Daemon; use HTTP::Response; use HTTP::Status;
+use JSON::PP; use POSIX qw(WNOHANG);
+
+my $d = HTTP::Daemon-&gt;new(
+    LocalAddr =&gt; &#39;127.0.0.1&#39;,
+    LocalPort =&gt; $ENV{RDW_PORT} // 7681,
+    ReuseAddr =&gt; 1,
+) or die &#34;cannot start server: $!&#34;;
+
+while (my $c = $d-&gt;accept) {
+    my $r = $c-&gt;get_request or next;
+    my $path   = $r-&gt;uri-&gt;path;
+    my $method = $r-&gt;method;
+    my $body   = $r-&gt;content;
+
+    my $response = route($method, $path, $body);
+    $c-&gt;send_response($response);
+    $c-&gt;close;
+}
+
+sub route {
+    my ($method, $path, $body) = @_;
+    my $params = $body ? eval { decode_json($body) } // {} : {};
+
+    # Windows
+    return create_window($params)     if $method eq &#39;POST&#39;   &amp;&amp; $path eq &#39;/api/v1/windows&#39;;
+    return list_windows()             if $method eq &#39;GET&#39;    &amp;&amp; $path eq &#39;/api/v1/windows&#39;;
+    return focus_window($path,$params) if $method eq &#39;POST&#39;  &amp;&amp; $path =~ m|/windows/([^/]+)/focus|;
+    # KV
+    return kv_get($path)              if $method eq &#39;GET&#39;    &amp;&amp; $path =~ m|/kv/(.+)|;
+    return kv_set($path,$params)      if $method eq &#39;PUT&#39;    &amp;&amp; $path =~ m|/kv/(.+)|;
+    # Stream ingest
+    return ingest($path,$params)      if $method eq &#39;POST&#39;   &amp;&amp; $path =~ m|/stream/(.+)|;
+    # Status
+    return server_status()            if $method eq &#39;GET&#39;    &amp;&amp; $path eq &#39;/api/v1/status&#39;;
+    # Frontend
+    return serve_spa()                if $method eq &#39;GET&#39;    &amp;&amp; $path eq &#39;/&#39;;
+
+    return HTTP::Response-&gt;new(RC_NOT_FOUND);
+}
+</code></pre>
+<h3>Line ingest and formatter dispatch</h3>
+<p>When a line arrives at <code>POST /api/v1/stream/{id}</code>, the server: 1. Looks up any registered formatter for that pane (stored in KV as <code>fmt.ID.cmd</code>) 2. If found, calls it per-line with the current KV as environment 3. Writes the output to the stream named pipe (which the WS hub fans out)</p>
+<pre><code class="language-perl">sub ingest {
+    my ($path, $params) = @_;
+    my ($id) = $path =~ m|/stream/(.+)|;
+    my $line  = $params-&gt;{line} // return HTTP::Response-&gt;new(RC_BAD_REQUEST);
+    my $kv    = read_kv();
+    my $fmt   = $kv-&gt;{&#34;fmt.$id.cmd&#34;};
+
+    my $display = $fmt ? run_formatter($fmt, $line, $kv) : $line;
+
+    # Write to stream pipe for WS hub
+    open my $fh, &#39;&gt;&gt;&#39;, &#34;$RDW_RUN/stream&#34; or return HTTP::Response-&gt;new(RC_INTERNAL_SERVER_ERROR);
+    print $fh encode_json({type=&gt;&#39;line&#39;, target_id=&gt;$id, line=&gt;$display}) . &#34;\n&#34;;
+    close $fh;
+
+    # Append to ring buffer (last 200 lines per pane)
+    append_ring($id, $display);
+
+    return HTTP::Response-&gt;new(RC_NO_CONTENT);
+}
+
+sub run_formatter {
+    my ($cmd, $line, $kv) = @_;
+    # Build environment: current KV keys injected as env vars
+    my %env = (%ENV, map { $_ =&gt; $kv-&gt;{$_} } keys %$kv);
+    # Run formatter with line on stdin
+    local %ENV = %env;
+    open my $in,  &#39;&lt;&#39;, \$line;
+    open my $out, &#39;&gt;&#39;, \my $result;
+    open my $fh,  &#39;-|&#39;, &#34;sh&#34;, &#34;-c&#34;, $cmd or return $line;
+    # Feed line to formatter stdin
+    print $fh &#34;$line\n&#34;;
+    $result = &lt;$fh&gt;;
+    close $fh;
+    return $result // $line;
+}
+</code></pre>
+<h3>Use cases for rdw-server outside this project</h3>
+<ul><li>Any project needing a minimal Perl HTTP + WebSocket server for real-time</li>
+</ul>
+<p>  browser display of backend data</p>
+<ul><li>A simple dashboard server for shell script output without a Node.js stack</li>
+<li>A named-pipe-to-WebSocket bridge for any Unix tool that writes to a pipe</li>
+<li>A lightweight REST API for session state stored as JSON files (no database needed)</li>
+<li>A building block for any browser-integrated debugging tool</li>
+</ul>
+<hr>
+<h2>Module 2 — rdw-relay (bash, ~40 lines)</h2>
+<h3>What it is</h3>
+<p>Reads stdin line by line, sends each line to rdw-server via Unix socket or HTTP. The simplest component. Could be a shell function.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-relay -- relay stdin to a named rdw pane
+# Usage: prog | rdw-relay --id PANE_ID [--port PORT]
+
+set -euo pipefail
+
+ID=&#34;&#34; PORT=7681 TOKEN=&#34;&#34;
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id)    ID=$2;    shift 2 ;;
+    --port)  PORT=$2;  shift 2 ;;
+    --token) TOKEN=$2; shift 2 ;;
+    *) echo &#34;unknown: $1&#34; &gt;&amp;2; exit 1 ;;
+  esac
+done
+[[ -z $ID ]] &amp;&amp; { echo &#34;rdw-relay: --id required&#34; &gt;&amp;2; exit 1; }
+
+SOCK=&#34;${XDG_RUNTIME_DIR:-/run/user/$UID}/rdw/${PORT}/rdw.sock&#34;
+BASE=&#34;http://127.0.0.1:$PORT/api/v1&#34;
+AUTH=${TOKEN:+-H &#34;Authorization: Bearer $TOKEN&#34;}
+
+# Reconnect queue: buffer lines when server unavailable
+QUEUE=&#34;&#34;
+MAX_QUEUE=1000
+
+send_line() {
+    local line=$1
+    local payload
+    payload=$(jq -Rn --arg l &#34;$line&#34; --arg id &#34;$ID&#34; \
+        &#39;{line: $l, target_id: $id}&#39;)
+
+    # Try Unix socket first (owner auth, no token needed)
+    if [[ -S $SOCK ]]; then
+        echo &#34;$payload&#34; | socat - &#34;UNIX-CONNECT:$SOCK&#34; 2&gt;/dev/null &amp;&amp; return 0
+    fi
+
+    # Fall back to HTTP
+    curl -sf -X POST &#34;$BASE/stream/$ID&#34; \
+        $AUTH \
+        -H &#39;Content-Type: application/json&#39; \
+        -d &#34;$payload&#34; &gt; /dev/null 2&gt;&amp;1 &amp;&amp; return 0
+
+    # Buffer on failure
+    local count
+    count=$(echo &#34;$QUEUE&#34; | wc -l)
+    if (( count &lt; MAX_QUEUE )); then
+        QUEUE=&#34;${QUEUE}${line}&#34;$&#39;\n&#39;
+    fi
+    return 1
+}
+
+flush_queue() {
+    local saved=&#34;$QUEUE&#34;
+    QUEUE=&#34;&#34;
+    while IFS= read -r line; do
+        [[ -z $line ]] &amp;&amp; continue
+        send_line &#34;$line&#34; || { QUEUE=&#34;${QUEUE}${line}&#34;$&#39;\n&#39;; return 1; }
+    done &lt;&lt;&lt; &#34;$saved&#34;
+}
+
+while IFS= read -r line; do
+    [[ -n $QUEUE ]] &amp;&amp; flush_queue
+    send_line &#34;$line&#34;
+done
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>Relay any Unix process output to any HTTP endpoint (change the URL)</li>
+<li>A buffered HTTP POST relay for unreliable network connections</li>
+<li>Drop-in replacement for <code>logger</code> that sends to a web endpoint instead of syslog</li>
+<li>Build custom monitoring pipelines: <code>tail -f app.log | rdw-relay --id monitor</code></li>
+</ul>
+<hr>
+<h2>Module 3 — rdw-compose (bash, ~120 lines)</h2>
+<h3>What it is</h3>
+<p>Translates rdw-style arguments into a shell pipeline. Prints the generated pipeline before running it. Covers all the flags removed from rdw-relay.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-compose -- compose a shell pipeline from rdw pipe arguments
+# Usage: prog | rdw-compose [options]
+# Always prints the generated pipeline to stderr before running
+
+set -euo pipefail
+
+ID=&#34;&#34; PORT=7681 TITLE=&#34;&#34; LAYOUT=&#34;&#34;
+FORWARD_FILE=&#34;&#34; FORWARD_CMD=&#34;&#34; FORWARD_RD=false
+DRY_RUN=false
+declare -a FILTERS=()
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id)               ID=$2;              shift 2 ;;
+    --port)             PORT=$2;            shift 2 ;;
+    --title)            TITLE=$2;           shift 2 ;;
+    --layout)           LAYOUT=$2;          shift 2 ;;
+    --filter)           FILTERS+=(&#34;$2&#34;);    shift 2 ;;
+    --forward-to-file)  FORWARD_FILE=$2;    shift 2 ;;
+    --forward-to-cmd)   FORWARD_CMD=$2;     shift 2 ;;
+    --forward)          FORWARD_RD=true;    shift ;;
+    --dry-run)          DRY_RUN=true;       shift ;;
+    @*)
+      # Named profile: source from ~/.config/rdw/profiles/
+      profile=&#34;${1#@}&#34;
+      src=&#34;$HOME/.config/rdw/profiles/$profile.sh&#34;
+      [[ -f $src ]] &amp;&amp; source &#34;$src&#34; || { echo &#34;unknown profile: $profile&#34; &gt;&amp;2; exit 1; }
+      shift ;;
+    *) echo &#34;unknown: $1&#34; &gt;&amp;2; exit 1 ;;
+  esac
+done
+
+[[ -z $ID ]] &amp;&amp; { echo &#34;rdw-compose: --id required&#34; &gt;&amp;2; exit 1; }
+
+# Setup commands (run before pipeline)
+declare -a SETUP=()
+[[ -n $LAYOUT ]] &amp;&amp; SETUP+=(&#34;rdw layout apply $(printf &#39;%q&#39; &#34;$LAYOUT&#34;) --port $PORT&#34;)
+[[ -n $TITLE  ]] &amp;&amp; SETUP+=(&#34;rdw pane rename $(printf &#39;%q&#39; &#34;$ID&#34;) $(printf &#39;%q&#39; &#34;$TITLE&#34;) --port $PORT&#34;)
+
+# Build relay with mirroring
+RELAY=&#34;rdw-relay --id $(printf &#39;%q&#39; &#34;$ID&#34;) --port $PORT&#34;
+[[ -n $FORWARD_FILE &amp;&amp; -n $FORWARD_CMD ]] &amp;&amp; \
+    RELAY=&#34;tee $(printf &#39;%q&#39; &#34;$FORWARD_FILE&#34;) &gt;(${FORWARD_CMD}) | $RELAY&#34;
+[[ -n $FORWARD_FILE &amp;&amp; -z $FORWARD_CMD  ]] &amp;&amp; \
+    RELAY=&#34;tee $(printf &#39;%q&#39; &#34;$FORWARD_FILE&#34;) | $RELAY&#34;
+[[ -z $FORWARD_FILE &amp;&amp; -n $FORWARD_CMD  ]] &amp;&amp; \
+    RELAY=&#34;tee &gt;(${FORWARD_CMD}) | $RELAY&#34;
+$FORWARD_RD &amp;&amp; \
+    RELAY=&#34;tee &gt;(rd -c $(printf &#39;%q&#39; &#34;$ID&#34;) 2&gt;/dev/null || true) | $RELAY&#34;
+
+# Build filter chain
+STAGES=&#34;&#34;
+for f in &#34;${FILTERS[@]}&#34;; do
+    STAGES=&#34;${STAGES:+$STAGES | }$f&#34;
+done
+
+PIPELINE=&#34;${STAGES:+$STAGES | }$RELAY&#34;
+
+# Always show generated pipeline
+{
+    echo &#34;# rdw-compose:&#34;
+    for s in &#34;${SETUP[@]}&#34;; do echo &#34;#   $s&#34;; done
+    echo &#34;#   stdin | $PIPELINE&#34;
+} &gt;&amp;2
+
+$DRY_RUN &amp;&amp; exit 0
+
+# Run setup
+for cmd in &#34;${SETUP[@]}&#34;; do eval &#34;$cmd&#34;; done
+
+# Execute pipeline
+exec bash -c &#34;cat | $PIPELINE&#34;
+</code></pre>
+<h3>Profile system</h3>
+<pre><code class="language-bash"># Save a profile
+rdw-compose --id log --filter &#39;grep ERROR&#39; --title &#34;App Log&#34; \
+    --forward-to-file /tmp/app.log --save-profile myapp
+
+# Profile is stored as a plain shell script:
+# ~/.config/rdw/profiles/myapp.sh
+# #!/usr/bin/env bash
+# # rdw-compose profile: myapp
+# ID=log PORT=7681 TITLE=&#34;App Log&#34;
+# FORWARD_FILE=/tmp/app.log
+# FILTERS=(&#34;grep ERROR&#34;)
+
+# Use it:
+prog | rdw-compose @myapp
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>A general-purpose pipeline composer for any tool with filter/mirror/setup flags</li>
+<li>Template for &#34;smart argument parsers&#34; that decompose into shell primitives</li>
+<li>Teaching tool: shows students what shell composition looks like for complex pipelines</li>
+<li>CI pipeline builder: <code>rdw-compose --dry-run</code> generates the pipeline for documentation</li>
+</ul>
+<hr>
+<h2>Module 4 — rdw (bash, thin REST client, ~200 lines)</h2>
+<h3>What it is</h3>
+<p>The user-facing CLI. Every subcommand maps to exactly one REST call. No local logic. Uses curl + jq.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw -- thin REST client for rdw-server
+
+set -euo pipefail
+
+RDW_PORT=${RDW_PORT:-7681}
+RDW_TOKEN=${RDW_TOKEN:-$(cat ~/.config/rdw/token 2&gt;/dev/null || true)}
+BASE=&#34;http://127.0.0.1:$RDW_PORT/api/v1&#34;
+AUTH=${RDW_TOKEN:+-H &#34;Authorization: Bearer $RDW_TOKEN&#34;}
+
+api_get()    { curl -sf      &#34;$BASE/$1&#34; $AUTH; }
+api_post()   { curl -sf -X POST   &#34;$BASE/$1&#34; $AUTH -H &#39;Content-Type: application/json&#39; -d &#34;$2&#34;; }
+api_put()    { curl -sf -X PUT    &#34;$BASE/$1&#34; $AUTH -H &#39;Content-Type: application/json&#39; -d &#34;$2&#34;; }
+api_patch()  { curl -sf -X PATCH  &#34;$BASE/$1&#34; $AUTH -H &#39;Content-Type: application/json&#39; -d &#34;$2&#34;; }
+api_delete() { curl -sf -X DELETE &#34;$BASE/$1&#34; $AUTH; }
+
+case &#34;${1:-help} ${2:-}&#34; in
+  # Server
+  &#34;server start&#34;) shift 2; exec rdw-server &#34;$@&#34; ;;
+  &#34;server stop&#34;)  api_post &#39;server/stop&#39; &#39;{}&#39; ;;
+  &#34;server list&#34;)  cat &#34;${XDG_CACHE_HOME:-$HOME/.cache}/rdw/servers.json&#34; 2&gt;/dev/null | jq . ;;
+
+  # Windows
+  &#34;window create&#34;) api_post &#34;windows&#34; &#34;$(jq -n --arg n &#34;$3&#34; &#39;{name:$n}&#39;)&#34; ;;
+  &#34;window close&#34;)  api_delete &#34;windows/$3&#34; ;;
+  &#34;window rename&#34;) api_patch  &#34;windows/$3&#34; &#34;$(jq -n --arg n &#34;$4&#34; &#39;{name:$n}&#39;)&#34; ;;
+  &#34;window focus&#34;)  api_post   &#34;windows/$3/focus&#34; &#39;{}&#39; ;;
+  &#34;window list&#34;)   api_get    &#34;windows&#34; | jq -r &#39;.windows[].name&#39; ;;
+
+  # Panes
+  &#34;pane split&#34;)    api_post   &#34;panes/$3/split&#34; &#34;$(jq -n --arg d &#34;${4:-h}&#34; &#39;{dir:$d}&#39;)&#34; ;;
+  &#34;pane zoom&#34;)     api_post   &#34;panes/$3/zoom&#34; &#39;{}&#39; ;;
+  &#34;pane resize&#34;)   api_post   &#34;panes/$3/resize&#34; &#34;$(jq -n --arg s &#34;$4&#34; &#39;{size:$s}&#39;)&#34; ;;
+  &#34;pane rename&#34;)   api_patch  &#34;panes/$3&#34; &#34;$(jq -n --arg t &#34;$4&#34; &#39;{title:$t}&#39;)&#34; ;;
+  &#34;pane close&#34;)    api_delete &#34;panes/$3&#34; ;;
+
+  # KV
+  &#34;kv set&#34;)    api_put    &#34;kv/$3&#34; &#34;$(jq -n --arg v &#34;$4&#34; &#39;{value:$v}&#39;)&#34; ;;
+  &#34;kv get&#34;)    api_get    &#34;kv/$3&#34; | jq -r &#39;.value&#39; ;;
+  &#34;kv delete&#34;) api_delete &#34;kv/$3&#34; ;;
+  &#34;kv list&#34;)   api_get    &#34;kv${3:+?prefix=$3}&#34; | jq -r &#39;.keys[]&#39; ;;
+
+  # Layout
+  &#34;layout apply&#34;) api_post &#34;layouts/$3/apply&#34; &#39;{}&#39; ;;
+  &#34;layout save&#34;)  api_post &#34;layouts&#34; &#34;$(jq -n --arg n &#34;$3&#34; &#39;{name:$n}&#39;)&#34; ;;
+  &#34;layout list&#34;)  api_get  &#34;layouts&#34; | jq -r &#39;.layouts[]&#39; ;;
+
+  # Formatter
+  &#34;formatter register&#34;)   rdw kv set &#34;fmt.$3.cmd&#34; &#34;$4&#34; ;;
+  &#34;formatter unregister&#34;) rdw kv delete &#34;fmt.$3.cmd&#34; ;;
+  &#34;formatter list&#34;)       rdw kv list fmt. | sed &#39;s/\.cmd$//&#39; | sort -u ;;
+
+  # Status
+  &#34;status&#34;)      api_get &#34;status&#34; | jq . ;;
+  &#34;status pane&#34;) api_get &#34;status/panes/$3&#34; | jq . ;;
+
+  # Cycle
+  &#34;cycle start&#34;) exec rdw-cycle &#34;$3&#34; &#34;${4:-5}&#34; ;;
+  &#34;cycle stop&#34;)  pkill -f rdw-cycle 2&gt;/dev/null || true ;;
+
+  # Send
+  &#34;send&#34;)  shift; exec rdw-send &#34;$@&#34; ;;
+
+  # Pipe (backward compat → rdw-compose)
+  &#34;pipe&#34;)  shift; exec rdw-compose &#34;$@&#34; ;;
+
+  *) echo &#34;usage: rdw COMMAND [args]&#34; &gt;&amp;2; exit 1 ;;
+esac
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>Template for a &#34;thin CLI over REST API&#34; in bash — copy and change BASE URL</li>
+<li>A curl wrapper pattern that handles auth tokens and JSON cleanly</li>
+<li>Any project needing a shell-accessible REST client without Python or Node</li>
+</ul>
+<hr>
+<h2>Module 5 — rdw-ws-hub (bash + websocat)</h2>
+<h3>What it is</h3>
+<p>Manages WebSocket connections to browsers. Reads from a named pipe, fans out to all connected clients. websocat does the actual WebSocket protocol.</p>
+<p>This replaces the Go <code>internal/server/hub.go</code> (123 lines of Go).</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-ws-hub -- WebSocket fan-out hub using websocat
+# Each browser connects to websocat; lines arrive on $STREAM pipe
+
+set -euo pipefail
+
+RDW_RUN=&#34;${RDW_RUN:-/run/rdw/default}&#34;
+WS_PORT=&#34;${RDW_WS_PORT:-7682}&#34;
+STREAM=&#34;$RDW_RUN/stream&#34;
+CLIENTS=&#34;$RDW_RUN/clients&#34;
+
+mkdir -p &#34;$CLIENTS&#34;
+mkfifo &#34;$STREAM&#34; 2&gt;/dev/null || true
+
+# Start websocat server. Each incoming connection is handled by a subshell
+# that reads from its own named pipe in CLIENTS/.
+websocat --server &#34;ws://127.0.0.1:$WS_PORT&#34; \
+    -E &#34;bash -c &#39;
+        id=\$\$
+        pipe=$CLIENTS/\$id
+        mkfifo \&#34;\$pipe\&#34;
+        trap \&#34;rm -f \$pipe\&#34; EXIT
+        cat \&#34;\$pipe\&#34;
+    &#39;&#34; &amp;
+WS_PID=$!
+
+# Fan-out loop: read from stream, write to all client pipes
+# Also append to ring buffer (last 200 lines per pane)
+declare -A rings
+
+while IFS= read -r line; do
+    # Ring buffer: extract target_id from JSON, store last 200 display lines
+    target_id=$(echo &#34;$line&#34; | jq -r &#39;.target_id // empty&#39; 2&gt;/dev/null)
+    if [[ -n $target_id ]]; then
+        rings[$target_id]+=&#34;$line&#34;$&#39;\n&#39;
+        # Trim to last 200 lines
+        rings[$target_id]=$(echo &#34;${rings[$target_id]}&#34; | tail -200)
+    fi
+
+    # Fan out to all connected clients
+    for pipe in &#34;$CLIENTS&#34;/*; do
+        [[ -p $pipe ]] || continue
+        echo &#34;$line&#34; &gt; &#34;$pipe&#34; 2&gt;/dev/null || rm -f &#34;$pipe&#34;
+    done
+done &lt; &lt;(tail -f &#34;$STREAM&#34;)
+
+wait $WS_PID
+</code></pre>
+<h3>Reconnect replay</h3>
+<p>When a browser reconnects, rdw-server sends the ring buffer for each pane. The ring buffer is stored in memory in the fan-out process and also persisted to <code>/run/rdw/ID/rings/PANEID</code> (200-line text files, one per pane).</p>
+<pre><code class="language-bash"># On reconnect: replay ring buffer for requested pane
+replay_pane() {
+    local pane_id=$1
+    local ring_file=&#34;$RDW_RUN/rings/$pane_id&#34;
+    [[ -f $ring_file ]] || return 0
+    cat &#34;$ring_file&#34;
+}
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>Any project needing WebSocket fan-out from a shell pipeline</li>
+<li>A real-time log broadcaster: <code>tail -f app.log | rdw-ws-hub-simple</code></li>
+<li>Multi-client notification system using only bash + websocat</li>
+<li>Building block for browser-integrated monitoring without Node.js</li>
+</ul>
+<hr>
+<h2>Module 6 — rdw-kv (bash + perl, KV store)</h2>
+<h3>What it is</h3>
+<p>The session KV store. In the rewrite it is a directory of files (<code>/run/rdw/ID/kv/</code>) where each key is a file. This is maximally Unix-like: <code>cat</code>, <code>echo</code>, <code>find</code>, and <code>ls</code> all work on the KV store directly.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-kv-set -- write a KV key
+# Usage: rdw-kv-set KEY VALUE
+RDW_RUN=&#34;${RDW_RUN:-/run/rdw/default}&#34;
+KV_DIR=&#34;$RDW_RUN/kv&#34;
+mkdir -p &#34;$KV_DIR&#34;
+key=$1 value=$2
+# Sanitise key: replace : and / with _ for filesystem safety
+safe_key=&#34;${key//[:\/]/_}&#34;
+echo -n &#34;$value&#34; &gt; &#34;$KV_DIR/$safe_key&#34;
+# Emit change event
+echo &#34;{\&#34;type\&#34;:\&#34;kv_update\&#34;,\&#34;key\&#34;:\&#34;$key\&#34;,\&#34;value\&#34;:\&#34;$value\&#34;}&#34; \
+    &gt;&gt; &#34;$RDW_RUN/events&#34;
+
+#!/usr/bin/env bash
+# rdw-kv-get -- read a KV key
+RDW_RUN=&#34;${RDW_RUN:-/run/rdw/default}&#34;
+key=$1
+safe_key=&#34;${key//[:\/]/_}&#34;
+cat &#34;$RDW_RUN/kv/$safe_key&#34; 2&gt;/dev/null || echo &#34;&#34;
+</code></pre>
+<p>The <code>=:key=value</code> control sequence is handled by rdw-server&#39;s ingest path:</p>
+<pre><code class="language-perl"># In rdw-server&#39;s ingest: detect =: prefix and write KV
+if ($line =~ /^=:(.+)/) {
+    for my $pair (split /;/, $1) {
+        my ($k, $v) = split /=/, $pair, 2;
+        kv_set(trim($k), trim($v));
+    }
+    return;  # don&#39;t display KV lines
+}
+</code></pre>
+<h3>SQLite persistence (perl)</h3>
+<pre><code class="language-perl"># Optional: persist KV to SQLite
+sub kv_persist {
+    my ($key, $value) = @_;
+    return unless $ENV{RDW_KV_PERSIST};
+    require DBI;
+    my $dbh = DBI-&gt;connect(&#34;dbi:SQLite:$ENV{RDW_KV_PERSIST}&#34;, &#39;&#39;, &#39;&#39;,
+        {RaiseError =&gt; 1, AutoCommit =&gt; 1});
+    $dbh-&gt;do(&#34;CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)&#34;);
+    $dbh-&gt;do(&#34;INSERT OR REPLACE INTO kv VALUES (?,?)&#34;, undef, $key, $value);
+}
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>Any shell project needing a lightweight shared key-value store across processes</li>
+<li>Process coordination: <code>rdw-kv-set build.status running</code> visible to all watchers</li>
+<li>Configuration distribution: set config values that multiple scripts read</li>
+<li>Simple pub-sub: watch a key, trigger actions when it changes</li>
+</ul>
+<hr>
+<h2>Module 7 — rdw-kv-watch (bash, ~25 lines)</h2>
+<h3>What it is</h3>
+<p>Watches a KV key and runs a command when the value changes. Uses inotifywait on Linux (from inotify-tools) or a polling fallback.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-kv-watch -- watch a KV key and run CMD on change
+# Usage: rdw-kv-watch KEY CMD [--poll N]
+
+set -euo pipefail
+KEY=$1 CMD=$2 POLL=${3:-1}
+RDW_RUN=&#34;${RDW_RUN:-/run/rdw/default}&#34;
+safe_key=&#34;${KEY//[:\/]/_}&#34;
+KV_FILE=&#34;$RDW_RUN/kv/$safe_key&#34;
+
+prev=$(cat &#34;$KV_FILE&#34; 2&gt;/dev/null || echo &#34;&#34;)
+
+if command -v inotifywait &gt;/dev/null 2&gt;&amp;1; then
+    # Efficient: inotify on Linux
+    while inotifywait -q -e close_write &#34;$KV_FILE&#34; 2&gt;/dev/null; do
+        cur=$(cat &#34;$KV_FILE&#34;)
+        [[ &#34;$cur&#34; != &#34;$prev&#34; ]] &amp;&amp; { prev=$cur; RDW_KV_VALUE=&#34;$cur&#34; eval &#34;$CMD&#34;; }
+    done
+else
+    # Fallback: polling
+    while true; do
+        cur=$(cat &#34;$KV_FILE&#34; 2&gt;/dev/null || echo &#34;&#34;)
+        [[ &#34;$cur&#34; != &#34;$prev&#34; ]] &amp;&amp; { prev=$cur; RDW_KV_VALUE=&#34;$cur&#34; eval &#34;$CMD&#34;; }
+        sleep &#34;$POLL&#34;
+    done
+fi
+</code></pre>
+<h3>Use cases outside this project</h3>
+<ul><li>Trigger deployment scripts when a CI status KV key changes</li>
+<li>Reload nginx config when a KV key changes: <code>rdw-kv-watch config.version &#34;nginx -s reload&#34;</code></li>
+<li>Dashboard automation: change a window&#39;s layout based on time-of-day KV key</li>
+</ul>
+<hr>
+<h2>Module 8 — rdw-cycle (bash, ~25 lines)</h2>
+<p>Rotates window focus through a list at a configurable interval.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-cycle -- rotate browser focus through windows
+# Usage: rdw-cycle WINDOW,WINDOW,... [INTERVAL_SECONDS]
+
+set -euo pipefail
+IFS=, read -ra WINS &lt;&lt;&lt; &#34;$1&#34;
+INTERVAL=${2:-5}
+i=0
+
+# Register in KV so rdw status shows cycle state
+rdw kv set cycle.running true
+rdw kv set cycle.windows &#34;$1&#34;
+rdw kv set cycle.interval_ms &#34;$(( INTERVAL * 1000 ))&#34;
+trap &#39;rdw kv set cycle.running false&#39; EXIT
+
+while true; do
+    rdw window focus &#34;${WINS[$i]}&#34;
+    i=$(( (i + 1) % ${#WINS[@]} ))
+    sleep &#34;$INTERVAL&#34;
+done
+</code></pre>
+<hr>
+<h2>Module 9 — The windowing system in bash/perl</h2>
+<h3>Why this is the most complex part</h3>
+<p>The windowing system (windows, panes, split/resize/zoom/swap, layout YAML) is the hardest component to move from Go. In Go it is a typed struct tree with mutexes. In bash/perl it must be a JSON file with file locking. This section documents the design in detail.</p>
+<h3>Data model</h3>
+<p>The session state is a JSON file:</p>
+<pre><code class="language-json">{
+  &#34;schema_version&#34;: 1,
+  &#34;active_window&#34;: 0,
+  &#34;windows&#34;: [
+    {
+      &#34;name&#34;: &#34;build&#34;,
+      &#34;panes&#34;: [
+        {
+          &#34;target_id&#34;: &#34;log&#34;,
+          &#34;title&#34;: &#34;Build Log&#34;,
+          &#34;split&#34;: &#34;h&#34;,
+          &#34;size&#34;: &#34;60%&#34;,
+          &#34;group&#34;: &#34;&#34;,
+          &#34;private&#34;: false,
+          &#34;formatter&#34;: &#34;&#34;
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+<h3>Reading and writing safely in perl</h3>
+<pre><code class="language-perl">#!/usr/bin/env perl
+# rdw-session.pm -- session state management
+package RDW::Session;
+use strict; use warnings;
+use JSON::PP; use Fcntl qw(:flock);
+
+my $SESSION_FILE = $ENV{RDW_RUN} . &#39;/session.json&#39;;
+
+sub read {
+    open my $fh, &#39;&lt;&#39;, $SESSION_FILE or return _empty();
+    flock $fh, LOCK_SH;
+    my $json = do { local $/; &lt;$fh&gt; };
+    close $fh;
+    return decode_json($json);
+}
+
+sub write {
+    my ($state) = @_;
+    open my $fh, &#39;&gt;&#39;, $SESSION_FILE or die &#34;session write: $!&#34;;
+    flock $fh, LOCK_EX;
+    print $fh encode_json($state) . &#34;\n&#34;;
+    close $fh;
+    _emit_layout_update($state);
+}
+
+sub _emit_layout_update {
+    my ($state) = @_;
+    my $event = encode_json({type =&gt; &#39;layout_update&#39;, payload =&gt; $state});
+    open my $fh, &#39;&gt;&gt;&#39;, $ENV{RDW_RUN} . &#39;/events&#39; or return;
+    flock $fh, LOCK_EX;
+    print $fh &#34;$event\n&#34;;
+    close $fh;
+}
+
+sub _empty { {schema_version=&gt;1, active_window=&gt;0, windows=&gt;[]} }
+
+# Window operations
+sub create_window {
+    my ($name) = @_;
+    my $s = read();
+    die &#34;window exists: $name\n&#34; if grep { $_-&gt;{name} eq $name } @{$s-&gt;{windows}};
+    push @{$s-&gt;{windows}}, {name =&gt; $name, panes =&gt; []};
+    write($s);
+}
+
+sub focus_window {
+    my ($name) = @_;
+    my $s = read();
+    my ($idx) = grep { $s-&gt;{windows}[$_]{name} eq $name } 0..$#{$s-&gt;{windows}};
+    defined $idx or die &#34;window not found: $name\n&#34;;
+    $s-&gt;{active_window} = $idx;
+    write($s);
+}
+
+sub add_pane {
+    my ($window_name, $pane) = @_;
+    my $s = read();
+    my ($win) = grep { $_-&gt;{name} eq $window_name } @{$s-&gt;{windows}};
+    die &#34;window not found: $window_name\n&#34; unless $win;
+    die &#34;max panes reached\n&#34; if @{$win-&gt;{panes}} &gt;= 64;
+    push @{$win-&gt;{panes}}, $pane;
+    write($s);
+}
+
+sub find_pane {
+    my ($target_id) = @_;
+    my $s = read();
+    for my $win (@{$s-&gt;{windows}}) {
+        for my $pane (@{$win-&gt;{panes}}) {
+            return ($win, $pane) if $pane-&gt;{target_id} eq $target_id;
+        }
+    }
+    return ();
+}
+
+sub set_pane_title {
+    my ($target_id, $title) = @_;
+    my $s = read();
+    for my $win (@{$s-&gt;{windows}}) {
+        for my $pane (@{$win-&gt;{panes}}) {
+            if ($pane-&gt;{target_id} eq $target_id) {
+                $pane-&gt;{title} = $title;
+                write($s);
+                return 1;
+            }
+        }
+    }
+    die &#34;pane not found: $target_id\n&#34;;
+}
+
+sub apply_layout {
+    my ($layout) = @_;
+    # Layout is a hash with {windows:[{name,panes:[...]}]}
+    # Merge: add windows not present, add panes not present
+    my $s = read();
+    my %existing = map { $_-&gt;{name} =&gt; 1 } @{$s-&gt;{windows}};
+    for my $lwin (@{$layout-&gt;{windows}}) {
+        unless ($existing{$lwin-&gt;{name}}) {
+            push @{$s-&gt;{windows}}, {name =&gt; $lwin-&gt;{name}, panes =&gt; $lwin-&gt;{panes}};
+        }
+    }
+    write($s);
+}
+
+1;
+</code></pre>
+<h3>Layout YAML parsing</h3>
+<p>rdw-server uses perl&#39;s <code>YAML::Tiny</code> (ships with perl) or calls the system <code>yq</code> tool to parse YAML layouts:</p>
+<pre><code class="language-perl"># Parse layout file using YAML::Tiny (ships with many perl distributions)
+use YAML::Tiny;
+sub load_layout_file {
+    my ($path) = @_;
+    my $yaml = YAML::Tiny-&gt;read($path) or die &#34;cannot parse $path: $!&#34;;
+    return $yaml-&gt;[0];
+}
+</code></pre>
+<p>If YAML::Tiny is unavailable, fall back to <code>yq</code> (Go tool, widely installed):</p>
+<pre><code class="language-bash">load_layout() {
+    local path=$1
+    # Convert YAML to JSON using yq, then parse with jq
+    yq eval -o=json &#34;$path&#34; | jq .
+}
+</code></pre>
+<h3>Why the windowing system needs extra documentation</h3>
+<p>The Go implementation uses mutex-protected struct trees with atomic updates. In bash/perl, the equivalent is:</p>
+<ol><li><strong>All state in one JSON file</strong> — single source of truth, readable by any tool</li>
+<li><strong>flock for mutual exclusion</strong> — <code>flock(1)</code> wraps any shell command safely</li>
+<li><strong>Atomic write</strong> — write to a temp file, <code>mv</code> to final path (atomic on same filesystem)</li>
+<li><strong>Event emission</strong> — every state change appends to the events FIFO</li>
+</ol>
+<pre><code class="language-bash"># Atomic session write pattern used throughout
+atomic_write() {
+    local dest=$1 content=$2
+    local tmp=$(mktemp &#34;$dest.XXXXXX&#34;)
+    echo &#34;$content&#34; &gt; &#34;$tmp&#34;
+    mv &#34;$tmp&#34; &#34;$dest&#34;
+}
+
+# Safe session mutation from bash
+mutate_session() {
+    local mutation_fn=$1
+    (
+        flock 9
+        local state
+        state=$(cat &#34;$RDW_RUN/session.json&#34;)
+        local new_state
+        new_state=$(echo &#34;$state&#34; | jq &#34;$mutation_fn&#34;)
+        atomic_write &#34;$RDW_RUN/session.json&#34; &#34;$new_state&#34;
+        echo &#34;$new_state&#34; | \
+            jq -c &#39;{type:&#34;layout_update&#34;, payload:.}&#39; &gt;&gt; &#34;$RDW_RUN/events&#34;
+    ) 9&gt;&#34;$RDW_RUN/session.lock&#34;
+}
+
+# Example: set active window index to 1
+mutate_session &#39;.active_window = 1&#39;
+</code></pre>
+<h3>Concurrency safety analysis</h3>
+<p>The flock+atomic-write pattern is safe for the concurrency level rdw operates at: one user, a handful of concurrent REST requests. It is not safe for high concurrency (100+ simultaneous writers). This is acceptable because rdw is a debugging tool, not a production server.</p>
+<p>The pattern has one failure mode: if the perl/bash process dies mid-write, the session file may be incomplete. mitigation: write to a temp file and mv (atomic).</p>
+<hr>
+<h2>Module 10 — rdw-send (bash, ~50 lines)</h2>
+<p>Detects file type, sends to pane. Uses <code>file</code>, <code>base64</code>, standard Unix tools.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-send -- send a file to a named rdw pane
+# Usage: rdw-send --id PANE FILE
+
+ID=&#34;&#34; PORT=7681
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --id) ID=$2; shift 2 ;;
+    --port) PORT=$2; shift 2 ;;
+    *) FILE=$1; shift ;;
+  esac
+done
+
+mime=$(file --brief --mime-type &#34;$FILE&#34;)
+ext=&#34;${FILE##*.}&#34;
+
+case &#34;$mime&#34; in
+    image/png|image/jpeg|image/gif|image/webp)
+        { echo &#34;f:image&#34;; base64 &#34;$FILE&#34;; } | rdw-relay --id &#34;$ID&#34; --port &#34;$PORT&#34;
+        ;;
+    image/svg+xml|*xml*)
+        [[ $ext == svg ]] &amp;&amp; { echo &#34;f:svg&#34;; cat &#34;$FILE&#34;; } | rdw-relay --id &#34;$ID&#34; --port &#34;$PORT&#34;
+        ;;
+    text/csv|text/tab-separated-values)
+        { echo &#34;f:csv&#34;; cat &#34;$FILE&#34;; } | rdw-relay --id &#34;$ID&#34; --port &#34;$PORT&#34;
+        ;;
+    text/markdown|text/x-markdown)
+        { echo &#34;f:markdown&#34;; cat &#34;$FILE&#34;; } | rdw-relay --id &#34;$ID&#34; --port &#34;$PORT&#34;
+        ;;
+    *)
+        cat &#34;$FILE&#34; | rdw-relay --id &#34;$ID&#34; --port &#34;$PORT&#34;
+        ;;
+esac
+</code></pre>
+<hr>
+<h2>Module 11 — Example formatters (bash/perl)</h2>
+<h3>rdw-fmt-json (bash, uses jq)</h3>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-fmt-json -- pretty-print JSON lines using jq
+while IFS= read -r line; do
+    echo &#34;$line&#34; | jq -C . 2&gt;/dev/null || echo &#34;$line&#34;
+done
+</code></pre>
+<h3>rdw-fmt-errors (bash)</h3>
+<pre><code class="language-bash">#!/usr/bin/env bash
+# rdw-fmt-errors -- highlight errors and warnings
+# KV: $HIGHLIGHT_COLOR from rdw kv set HIGHLIGHT_COLOR red
+while IFS= read -r line; do
+    case &#34;$line&#34; in
+        *ERROR*) echo &#34;&lt;span class=&#39;err&#39;&gt;${line}&lt;/span&gt;&#34; ;;
+        *WARN*)  echo &#34;&lt;span class=&#39;warn&#39;&gt;${line}&lt;/span&gt;&#34; ;;
+        *)       echo &#34;$line&#34; ;;
+    esac
+done
+</code></pre>
+<h3>rdw-fmt-table (perl)</h3>
+<pre><code class="language-perl">#!/usr/bin/env perl
+# rdw-fmt-table -- accumulate lines, render as HTML table when complete
+# Long-lived mode: keeps running, re-renders on each line
+use strict; use warnings;
+use HTML::Entities;
+
+my @rows;
+my $max_cols = 0;
+
+while (&lt;STDIN&gt;) {
+    chomp;
+    my @cells = split /\t/, $_;
+    push @rows, \@cells;
+    $max_cols = @cells if @cells &gt; $max_cols;
+    # Re-render entire table on each line
+    print render_table(\@rows, $max_cols);
+    $| = 1;
+}
+
+sub render_table {
+    my ($rows, $cols) = @_;
+    my $html = &#34;&lt;table class=&#39;rdw-table&#39;&gt;\n&#34;;
+    my $first = 1;
+    for my $row (@$rows) {
+        my $tag = $first ? &#39;th&#39; : &#39;td&#39;;
+        $html .= &#34;&lt;tr&gt;&#34; . join(&#39;&#39;, map { &#34;&lt;$tag&gt;&#34; . encode_entities($_//&#39;&#39;) . &#34;&lt;/$tag&gt;&#34; } @$row) . &#34;&lt;/tr&gt;\n&#34;;
+        $first = 0;
+    }
+    return $html . &#34;&lt;/table&gt;\n&#34;;
+}
+</code></pre>
+<hr>
+<h2>Features to remove or simplify</h2>
+<table>
+<tr><th>Feature</th><th>Recommendation</th><th>Reason</th></tr>
+<tr><td>Built-in formatters (text/json/yaml/markdown/csv/image)</td><td>Remove</td><td>User provides bash/perl scripts</td></tr>
+<tr><td>Scrollback buffer (10k lines)</td><td>Replace with 200-line ring</td><td><code>tee</code> stores; ring is for reconnect</td></tr>
+<tr><td>Export (<code>rdw save</code>)</td><td>Remove</td><td>`cat tee-file \</td><td>pandoc`</td></tr>
+<tr><td>Bookmarks</td><td>Remove</td><td>Needs scrollback</td></tr>
+<tr><td>Highlight profiles API</td><td>Simplify to KV keys</td><td><code>rdw kv set hl.errors.pattern ERROR</code></td></tr>
+<tr><td>Terminal panes</td><td>Remove</td><td>Use <code>ttyd</code> directly</td></tr>
+<tr><td><code>image:</code>/<code>svg:</code> sentinel framing</td><td>Remove</td><td>`base64 \</td><td>rdw-relay`</td></tr>
+<tr><td><code>t:</code> timestamp sequence</td><td>Remove</td><td>`prog \</td><td>ts \</td><td>rdw-relay`</td></tr>
+<tr><td><code>c:</code> clear sequence</td><td>Keep as <code>sc:clear</code></td><td>Useful shorthand</td></tr>
+<tr><td>Filter chain in server</td><td>Remove</td><td>Shell pipeline before relay</td></tr>
+<tr><td><code>POST /api/v1/panes/{id}/filters</code></td><td>Remove</td><td>Same</td></tr>
+<tr><td>Focus cycle as server feature</td><td>Move to rdw-cycle</td><td>External 25-line script</td></tr>
+<tr><td>Admin page auth token</td><td>Simplify</td><td>Unix socket access only for admin</td></tr>
+<tr><td>ANSI CSV column sort (JS)</td><td>Remove</td><td>Formatter provides its own JS</td></tr>
+<tr><td><code>formatter_set</code> WS message</td><td>Remove</td><td>No built-in formatters</td></tr>
+<tr><td><code>image_render</code>/<code>svg_render</code> WS</td><td>Remove</td><td>Formatter handles display</td></tr>
+<tr><td>Per-pane token scope</td><td>Simplify</td><td>Unix socket = no token needed locally</td></tr>
+</table>
+<hr>
+<h2>Comparison table: current Go vs bash/perl rewrite</h2>
+<p>Lines in the table are wrapped at 145 characters.</p>
+<pre><code>┌─────────────────────────┬──────────────────────────────────┬───────────────────────────────────┐
+│ Feature                 │ Current (Go)                     │ Rewrite (bash/perl)               │
+├─────────────────────────┼──────────────────────────────────┼───────────────────────────────────┤
+│ HTTP server             │ net/http in Go (~200 lines)      │ perl HTTP::Daemon (~150 lines)    │
+│ WebSocket               │ gorilla/websocket (~300 lines)   │ websocat + bash hub (~60 lines)   │
+│ Session state           │ Go struct + mutex                │ JSON file + flock                 │
+│ KV store                │ Go map + RWMutex                 │ directory of files + flock        │
+│ KV persistence          │ mattn/go-sqlite3 (CGO)          │ perl DBI + DBD::SQLite (pure)     │
+│ Line relay              │ Go binary + bufio.Scanner        │ bash + curl/socat (~40 lines)     │
+│ Filter chain            │ server-side Go function chain    │ shell pipeline before relay       │
+│ Built-in formatters     │ 6 Go implementations             │ removed; user provides scripts    │
+│ User formatters         │ CmdFormatter Go struct           │ KV key fmt.ID.cmd, called by perl │
+│ Pipeline composition    │ flags on rdw pipe                │ rdw-compose bash script           │
+│ Stream mirroring        │ --forward-to-file/cmd flags      │ tee in shell (no rdw code)        │
+│ Scrollback              │ 10k-line circular buffer (Go)    │ 200-line ring files per pane      │
+│ Export                  │ rdw save → Markdown bundle       │ removed; use tee + pandoc         │
+│ Bookmarks               │ BookmarkStore Go struct          │ removed with scrollback           │
+│ Window management       │ session.Manager Go struct        │ perl RDW::Session + JSON file     │
+│ Layout YAML             │ layout.LoadFile Go               │ YAML::Tiny or yq + jq             │
+│ Auth tokens             │ SHA-256 in Go auth.Store         │ simplified; Unix socket = no      │
+│                         │                                  │ token needed for local use        │
+│ Discovery (registry)    │ JSON file + kill -0 (Go)         │ JSON file + kill -0 (bash)        │
+│ Focus cycle             │ cycle.Cycle Go struct in server  │ rdw-cycle: 25-line bash script    │
+│ KV watch                │ proposed WebSocket subscription  │ rdw-kv-watch: 25-line bash/       │
+│                         │                                  │ inotifywait script                │
+│ Highlight profiles      │ highlight.Store Go struct        │ KV keys hl.NAME.pattern/class     │
+│ Terminal panes          │ terminal.Manager Go struct       │ removed; use ttyd directly        │
+│ Admin page              │ /admin HTML served by Go         │ /admin served by perl, same HTML  │
+│ Browser SPA             │ embedded in Go binary            │ static files on disk (default     │
+│                         │                                  │ shipped; user can replace)        │
+│ Event bus               │ WebSocket hub broadcasts         │ named pipe + tail -f; WS via      │
+│                         │                                  │ websocat hub                      │
+│ Bindings config         │ Go bindings.Store                │ JSON file read by SPA at startup  │
+│ Control sequences       │ control.Parse Go function        │ perl regex in ingest path         │
+│ Binary image transport  │ image:/image:end sentinel        │ removed; base64 FILE | relay      │
+│ rdw send                │ Go binary with magic detection   │ bash + file(1) command            │
+│ Test suite              │ 378 Go tests                     │ bats (bash test framework) +      │
+│                         │                                  │ perl Test::More                   │
+│ Binary size             │ ~15MB static Go binary           │ no compiled binary; ~2000 lines   │
+│                         │                                  │ bash + ~500 lines perl            │
+│ Build system            │ go build (CGO for SQLite)        │ none; scripts run directly        │
+│ Startup time            │ &lt;100ms                           │ &lt;50ms (no JVM/Python startup)    │
+│ Lines/sec throughput    │ ~50k/sec (Go goroutines)         │ ~2k/sec (curl per line); socat    │
+│                         │                                  │ mode: ~20k/sec                    │
+│ Memory per instance     │ ~20MB (Go runtime)               │ ~5MB (perl + bash processes)      │
+│ Cross-platform          │ go build for any OS/arch         │ requires bash 4+, perl 5.14+,     │
+│                         │                                  │ websocat; Linux/macOS             │
+│ Modifiability           │ requires Go compiler             │ any text editor; no build step    │
+│ Debuggability           │ go pprof, delve                  │ bash -x, perl -d, strace          │
+└─────────────────────────┴──────────────────────────────────┴───────────────────────────────────┘
+</code></pre>
+<hr>
+<h2>Testing strategy</h2>
+<p>Each module is independently testable:</p>
+<pre><code class="language-bash"># Test rdw-relay with bats (bash automated testing system)
+# test/rdw-relay.bats
+@test &#34;relay sends line to mock server&#34; {
+    # Start a mock HTTP server that records requests
+    nc -l 7681 &gt; /tmp/captured &amp;
+    NC_PID=$!
+    echo &#34;hello world&#34; | rdw-relay --id test --port 7681
+    kill $NC_PID
+    grep -q &#39;&#34;line&#34;:&#34;hello world&#34;&#39; /tmp/captured
+}
+
+# Test KV store directly
+@test &#34;kv set and get round-trip&#34; {
+    export RDW_RUN=$(mktemp -d)
+    rdw-kv-set mykey myvalue
+    result=$(rdw-kv-get mykey)
+    [ &#34;$result&#34; = &#34;myvalue&#34; ]
+}
+
+# Test session management with perl Test::More
+# test/session.t
+use Test::More;
+use RDW::Session;
+$ENV{RDW_RUN} = tempdir(CLEANUP =&gt; 1);
+RDW::Session::create_window(&#34;build&#34;);
+my $s = RDW::Session::read();
+is(scalar @{$s-&gt;{windows}}, 1);
+is($s-&gt;{windows}[0]{name}, &#34;build&#34;);
+done_testing;
+</code></pre>
+
+<div id="nav-bar"><a href="rewrite-architecture.html">← Rewrite Architecture</a><a href="worklog.html">Worklog →</a></div>
+</main>
+</body>
+</html>
