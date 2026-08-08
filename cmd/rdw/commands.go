@@ -153,7 +153,7 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 	port := portFlag(cmd)
 	idStr, _ := cmd.Flags().GetString("id")
 	layoutRef, _ := cmd.Flags().GetString("layout")
-	_ = cmd.Flags().Lookup("window")
+	windowName, _ := cmd.Flags().GetString("window")
 
 	id, err := session.ParseTargetID(idStr)
 	if err != nil {
@@ -171,6 +171,20 @@ func runPipe(cmd *cobra.Command, _ []string) error {
 		if err := applyLayoutRef(rc, layoutRef); err != nil {
 			return fmt.Errorf("applying layout %q: %w", layoutRef, err)
 		}
+	}
+
+	// If --window is given, focus that window (create if absent).
+	if windowName != "" {
+		rc := &restClient{base: fmt.Sprintf("http://127.0.0.1:%d", resolved)}
+		resp, err := rc.post("/api/v1/windows/"+windowName+"/focus", nil)
+		if err == nil && resp.StatusCode == http.StatusNotFound {
+			resp.Body.Close()
+			resp, err = rc.post("/api/v1/windows", map[string]string{"name": windowName})
+		}
+		if err != nil {
+			return fmt.Errorf("window %q: %w", windowName, err)
+		}
+		resp.Body.Close()
 	}
 
 	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
@@ -1144,8 +1158,13 @@ func runSend(cmd *cobra.Command, args []string) error {
 	socketPath, _ := unixSocketPath(fmt.Sprintf("%d", resolved))
 	line := buildSendLine(path, data)
 
+	sendID, err := session.ParseTargetID(idStr)
+	if err != nil {
+		return fmt.Errorf("invalid target ID %q: %w", idStr, err)
+	}
+
 	opts := pipepkg.Options{
-		TargetID:          mustParseID(idStr),
+		TargetID:          sendID,
 		Port:              resolved,
 		SocketPath:        socketPath,
 		ReconnectQueueLen: 10,
@@ -1203,15 +1222,6 @@ func isImageMagic(data []byte) bool {
 		return true
 	}
 	return false
-}
-
-func mustParseID(s string) session.TargetID {
-	id, err := session.ParseTargetID(s)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "invalid target ID %q: %v\n", s, err)
-		os.Exit(1)
-	}
-	return id
 }
 
 func min(a, b int) int {

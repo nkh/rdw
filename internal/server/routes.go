@@ -801,8 +801,15 @@ func (s *Server) handlePaneSwap(w http.ResponseWriter, r *http.Request) {
 	paneA.Split, paneB.Split = paneB.Split, paneA.Split
 	paneA.Size,  paneB.Size  = paneB.Size,  paneA.Size
 
-	_ = winA
-	_ = winB
+	// Move panes between windows if they live in different ones.
+	if winA != nil && winB != nil && winA.Name != winB.Name {
+		for i, p := range winA.Panes {
+			if p.TargetID == idA { winA.Panes[i] = paneB ; break }
+		}
+		for i, p := range winB.Panes {
+			if p.TargetID == idB { winB.Panes[i] = paneA ; break }
+		}
+	}
 
 	s.broadcastLayoutUpdate()
 	w.WriteHeader(http.StatusNoContent)
